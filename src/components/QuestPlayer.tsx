@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import type { DetectiveCase } from '../data/curriculum';
+import React, { useState, useEffect, useCallback } from 'react';
+import type { DetectiveCase, CrimeSceneHotspot, TimelineEvent } from '../data/curriculum';
 import type { DetectiveProfile } from '../services/supabase';
 import { soundEngine } from '../services/soundEngine';
 import confetti from 'canvas-confetti';
@@ -14,7 +14,13 @@ import {
   Sparkles,
   BookOpen,
   Lightbulb,
-  AlertTriangle
+  AlertTriangle,
+  Search,
+  GripVertical,
+  MousePointerClick,
+  Puzzle,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 
 interface QuestPlayerProps {
@@ -37,7 +43,35 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
   const [totalCaseXp, setTotalCaseXp] = useState(0);
   const [isCaseFinished, setIsCaseFinished] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  // 3 Attempts Cracking Magnifying Glasses
+  const [attemptsLeft, setAttemptsLeft] = useState(3);
+  const [showExhaustedModal, setShowExhaustedModal] = useState(false);
   
+  // Sentence Assembly state
+  const [assembledWords, setAssembledWords] = useState<string[]>([]);
+  const [availableWords, setAvailableWords] = useState<string[]>([]);
+  const [isSentenceCorrect, setIsSentenceCorrect] = useState<boolean | null>(null);
+  const [sentenceFeedback, setSentenceFeedback] = useState('');
+
+  // Crime Scene Search state
+  const [revealedHotspots, setRevealedHotspots] = useState<Set<string>>(new Set());
+  const [foundEvidence, setFoundEvidence] = useState(false);
+  const [activeHotspot, setActiveHotspot] = useState<CrimeSceneHotspot | null>(null);
+
+  // Matching Pairs state
+  const [selectedBulgarianId, setSelectedBulgarianId] = useState<string | null>(null);
+  const [selectedUkrainianId, setSelectedUkrainianId] = useState<string | null>(null);
+  const [matchedPairIds, setMatchedPairIds] = useState<Set<string>>(new Set());
+  const [shuffledUkrainian, setShuffledUkrainian] = useState<{ id: string; ukrainian: string }[]>([]);
+  const [pairMismatch, setPairMismatch] = useState<boolean>(false);
+
+  // Timeline Puzzle state
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const [isTimelineSubmitted, setIsTimelineSubmitted] = useState<boolean>(false);
+  const [isTimelineCorrect, setIsTimelineCorrect] = useState<boolean | null>(null);
+  const [timelineFeedback, setTimelineFeedback] = useState<string>('');
+
   // Interrogation Timer
   const activeStep = detectiveCase.steps[currentStepIndex];
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -53,6 +87,47 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
     setIsAnswerSubmitted(false);
     setIsCorrect(null);
     setFeedbackText('');
+    
+    // Reset attempts
+    setAttemptsLeft(3);
+    setShowExhaustedModal(false);
+
+    // Reset sentence assembly state
+    setAssembledWords([]);
+    setIsSentenceCorrect(null);
+    setSentenceFeedback('');
+
+    // Reset crime scene state
+    setRevealedHotspots(new Set());
+    setFoundEvidence(false);
+    setActiveHotspot(null);
+
+    // Reset matching pairs state
+    setSelectedBulgarianId(null);
+    setSelectedUkrainianId(null);
+    setMatchedPairIds(new Set());
+    setPairMismatch(false);
+    if (activeStep?.type === 'matching_pairs' && activeStep.matchingPairs) {
+      const shuffled = [...activeStep.matchingPairs].map(p => ({ id: p.id, ukrainian: p.ukrainian }));
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      setShuffledUkrainian(shuffled);
+    }
+
+    // Reset timeline puzzle state
+    setIsTimelineSubmitted(false);
+    setIsTimelineCorrect(null);
+    setTimelineFeedback('');
+    if (activeStep?.type === 'timeline_puzzle' && activeStep.timelineEvents) {
+      const shuffled = [...activeStep.timelineEvents];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      setTimelineEvents(shuffled);
+    }
   }, [currentStepIndex, activeStep]);
 
   useEffect(() => {
@@ -72,8 +147,34 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
     return () => clearInterval(timer);
   }, [timeLeft, isAnswerSubmitted, isCaseFinished]);
 
-  const handleTimeOut = () => {
+  // Initialize sentence assembly words when entering that step type
+  useEffect(() => {
+    if (activeStep?.type === 'sentence_assembly' && activeStep.sentenceFragments) {
+      const { correctOrder, distractorWords = [] } = activeStep.sentenceFragments;
+      const allWords = [...correctOrder, ...distractorWords];
+      // Fisher-Yates shuffle
+      for (let i = allWords.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allWords[i], allWords[j]] = [allWords[j], allWords[i]];
+      }
+      setAvailableWords(allWords);
+      setAssembledWords([]);
+    }
+  }, [currentStepIndex, activeStep]);
+
+  const registerMistake = () => {
     soundEngine.playTrapError();
+    setAttemptsLeft((prev) => {
+      const next = Math.max(0, prev - 1);
+      if (next === 0) {
+        setShowExhaustedModal(true);
+      }
+      return next;
+    });
+  };
+
+  const handleTimeOut = () => {
+    registerMistake();
     setIsAnswerSubmitted(true);
     setIsCorrect(false);
     setFeedbackText('Час вичерпано! Підозрюваний встиг знищити докази, поки ви вагалися. Спробуйте ще раз!');
@@ -86,6 +187,147 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
     soundEngine.speakBulgarian(activeStep.audioText, () => {
       setIsPlayingAudio(false);
     });
+  };
+
+  // Sentence Assembly handlers
+  const handleAddWord = useCallback((word: string, index: number) => {
+    soundEngine.playTypewriter();
+    setAvailableWords(prev => prev.filter((_, i) => i !== index));
+    setAssembledWords(prev => [...prev, word]);
+  }, []);
+
+  const handleRemoveWord = useCallback((word: string, index: number) => {
+    soundEngine.playTypewriter();
+    setAssembledWords(prev => prev.filter((_, i) => i !== index));
+    setAvailableWords(prev => [...prev, word]);
+  }, []);
+
+  const handleCheckSentence = () => {
+    if (!activeStep?.sentenceFragments) return;
+    const correct = activeStep.sentenceFragments.correctOrder;
+    const isCorrectAnswer = assembledWords.length === correct.length && 
+      assembledWords.every((w, i) => w === correct[i]);
+    
+    if (isCorrectAnswer) {
+      soundEngine.playStampThud();
+      soundEngine.playClueFound();
+      setIsSentenceCorrect(true);
+      setSentenceFeedback('Бездоганно! Записку відновлено — тепер її зміст кристально ясний!');
+      setTotalCaseXp(prev => prev + activeStep.xpReward);
+    } else {
+      registerMistake();
+      setIsSentenceCorrect(false);
+      setSentenceFeedback('Порядок слів неправильний. Уважно перечитайте фрагменти та спробуйте знову!');
+    }
+  };
+
+  const handleResetSentence = () => {
+    if (!activeStep?.sentenceFragments) return;
+    soundEngine.playPageTurn();
+    const { correctOrder, distractorWords = [] } = activeStep.sentenceFragments;
+    const allWords = [...correctOrder, ...distractorWords];
+    for (let i = allWords.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allWords[i], allWords[j]] = [allWords[j], allWords[i]];
+    }
+    setAvailableWords(allWords);
+    setAssembledWords([]);
+    setIsSentenceCorrect(null);
+    setSentenceFeedback('');
+  };
+
+  // Matching Pairs handlers
+  const checkPairMatch = (bgId: string, uaId: string) => {
+    if (bgId === uaId) {
+      soundEngine.playYarnStretch();
+      const newMatched = new Set([...matchedPairIds, bgId]);
+      setMatchedPairIds(newMatched);
+      setSelectedBulgarianId(null);
+      setSelectedUkrainianId(null);
+      if (activeStep?.matchingPairs && newMatched.size === activeStep.matchingPairs.length) {
+        soundEngine.playStampThud();
+        soundEngine.playClueFound();
+        setTotalCaseXp(prev => prev + activeStep.xpReward);
+      }
+    } else {
+      setPairMismatch(true);
+      registerMistake();
+      setTimeout(() => {
+        setSelectedBulgarianId(null);
+        setSelectedUkrainianId(null);
+        setPairMismatch(false);
+      }, 500);
+    }
+  };
+
+  const handleSelectBulgarian = (id: string) => {
+    if (matchedPairIds.has(id)) return;
+    soundEngine.playTypewriter();
+    setSelectedBulgarianId(id);
+    if (selectedUkrainianId) {
+      checkPairMatch(id, selectedUkrainianId);
+    }
+  };
+
+  const handleSelectUkrainian = (id: string) => {
+    if (matchedPairIds.has(id)) return;
+    soundEngine.playTypewriter();
+    setSelectedUkrainianId(id);
+    if (selectedBulgarianId) {
+      checkPairMatch(selectedBulgarianId, id);
+    }
+  };
+
+  // Timeline Puzzle handlers
+  const handleMoveTimelineItem = (idx: number, direction: 'up' | 'down') => {
+    if (isTimelineSubmitted && isTimelineCorrect) return;
+    soundEngine.playDragSnap();
+    setTimelineEvents((prev) => {
+      const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[targetIdx];
+      next[targetIdx] = temp;
+      return next;
+    });
+  };
+
+  const handleCheckTimeline = () => {
+    if (!activeStep?.timelineEvents) return;
+    const isCorrectOrder = timelineEvents.every((ev, idx) => ev.correctPosition === idx);
+    setIsTimelineSubmitted(true);
+    if (isCorrectOrder) {
+      soundEngine.playStampThud();
+      soundEngine.playClueFound();
+      setIsTimelineCorrect(true);
+      setTimelineFeedback('Чудово! Хронологічний ланцюг подій відновлено без жодної похибки!');
+      setTotalCaseXp(prev => prev + activeStep.xpReward);
+    } else {
+      registerMistake();
+      setIsTimelineCorrect(false);
+      setTimelineFeedback('Послідовність не сходиться! Зверніть увагу на час та черговість подій.');
+    }
+  };
+
+  const handleResetTimeline = () => {
+    soundEngine.playTypewriter();
+    setIsTimelineSubmitted(false);
+    setIsTimelineCorrect(null);
+    setTimelineFeedback('');
+  };
+
+  // Crime Scene handlers
+  const handleHotspotClick = (hotspot: CrimeSceneHotspot) => {
+    soundEngine.playSearchReveal();
+    setRevealedHotspots(prev => new Set([...prev, hotspot.id]));
+    setActiveHotspot(hotspot);
+    
+    if (hotspot.isEvidence && !foundEvidence) {
+      setFoundEvidence(true);
+      soundEngine.playClueFound();
+      setTotalCaseXp(prev => prev + activeStep.xpReward);
+    }
   };
 
   const handleSelectOption = (optId: string) => {
@@ -108,7 +350,7 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
       setFeedbackText(chosenOption.feedback);
       setTotalCaseXp(prev => prev + activeStep.xpReward);
     } else {
-      soundEngine.playTrapError();
+      registerMistake();
       setIsCorrect(false);
       setFeedbackText(chosenOption.feedback);
     }
@@ -167,6 +409,27 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
               style={{ width: `${progressPercent}%` }}
             />
           </div>
+        </div>
+
+        {/* 3 Attempts: Cracking Magnifying Glasses */}
+        <div className="flex items-center gap-1 bg-[#172236] border border-amber-900/40 px-2 sm:px-3 py-1.5 rounded-xl shadow-inner">
+          <span className="text-[10px] font-mono text-slate-400 mr-1 hidden sm:inline">Спроби:</span>
+          {[1, 2, 3].map((num) => {
+            const hasAttempt = num <= attemptsLeft;
+            return (
+              <span
+                key={num}
+                className={`text-xs sm:text-sm transition-all duration-300 ${
+                  hasAttempt
+                    ? 'scale-100 opacity-100 filter drop-shadow-[0_0_6px_rgba(212,175,55,0.7)]'
+                    : 'scale-90 opacity-25 grayscale'
+                }`}
+                title={hasAttempt ? 'Активна спроба' : 'Спроба втрачена'}
+              >
+                {hasAttempt ? '🔍' : '💥'}
+              </span>
+            );
+          })}
         </div>
 
         {/* Earned XP */}
@@ -238,7 +501,11 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
                          <AlertTriangle className="w-3 h-3 text-red-500 inline" /> Слово-пастка
                        </span>
                      ) :
-                     activeStep.type === 'boss_interrogation' ? '⚖️ Фінальний допит' : '🔎 Практика'}
+                     activeStep.type === 'boss_interrogation' ? '⚖️ Фінальний допит' :
+                     activeStep.type === 'sentence_assembly' ? '🧩 Відновлення записки' :
+                     activeStep.type === 'crime_scene_search' ? '🔦 Обшук локації' :
+                     activeStep.type === 'matching_pairs' ? '🧶 Зіставлення пар' :
+                     activeStep.type === 'timeline_puzzle' ? '⏳ Хронологія подій' : '🔎 Практика'}
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-800 leading-relaxed italic">
@@ -319,8 +586,453 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
               </div>
             )}
 
+            {/* SENTENCE ASSEMBLY (Reconstruct torn evidence) */}
+            {activeStep.type === 'sentence_assembly' && activeStep.sentenceFragments && (
+              <div className="bg-gradient-to-b from-[#18263e] to-[#0e1626] border-2 border-[#d4af37]/60 rounded-3xl p-5 sm:p-7 shadow-2xl mb-4 animate-in fade-in">
+                {/* Instruction */}
+                <div className="text-xs sm:text-sm text-slate-200 mb-4 font-sans leading-relaxed flex items-center gap-1.5">
+                  <Puzzle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-amber-400 font-bold">Завдання:</span>
+                  <span>{activeStep.instruction}</span>
+                </div>
+
+                {/* Assembly Drop Zone */}
+                <div className="mb-4">
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    📝 Зона відновлення записки:
+                  </div>
+                  <div className="min-h-[60px] p-3 bg-[#fbf7ee] border-2 border-amber-800/40 rounded-2xl flex flex-wrap gap-2 items-center shadow-inner rotate-[-0.3deg]">
+                    {assembledWords.length === 0 ? (
+                      <span className="text-xs italic text-amber-900/50 font-serif">Перетягніть слова сюди, щоб відновити записку...</span>
+                    ) : (
+                      assembledWords.map((word, idx) => (
+                        <button
+                          key={`assembled-${idx}`}
+                          onClick={() => handleRemoveWord(word, idx)}
+                          disabled={isSentenceCorrect === true}
+                          className="px-3 py-1.5 bg-[#d4af37] text-[#0a0e17] rounded-lg text-xs sm:text-sm font-bold font-serif-vintage shadow-md hover:bg-[#e5c158] transition-all active:scale-95 cursor-pointer border border-amber-700/50"
+                        >
+                          {word}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Available Word Chips */}
+                <div className="mb-4">
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <GripVertical className="w-3 h-3" /> Фрагменти записки:
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {availableWords.map((word, idx) => (
+                      <button
+                        key={`available-${idx}`}
+                        onClick={() => handleAddWord(word, idx)}
+                        disabled={isSentenceCorrect === true}
+                        className="px-3 py-1.5 bg-[#172338] text-slate-200 rounded-lg text-xs sm:text-sm font-mono border-2 border-slate-600 hover:border-[#d4af37] hover:text-[#f5d77f] hover:bg-[#1d2d48] transition-all active:scale-95 cursor-pointer shadow-sm"
+                      >
+                        {word}
+                      </button>
+                    ))}
+                    {availableWords.length === 0 && assembledWords.length > 0 && (
+                      <span className="text-[10px] italic text-slate-500">Усі фрагменти використано</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Audio (if present) */}
+                {activeStep.audioText && (
+                  <div className="flex justify-center mb-4">
+                    <button
+                      onClick={handlePlayBulgarianAudio}
+                      disabled={isPlayingAudio}
+                      className="px-4 py-2 rounded-xl bg-[#172338] hover:bg-[#1d2d48] text-slate-300 font-mono text-xs flex items-center gap-2 border border-slate-600 transition-all cursor-pointer"
+                    >
+                      <Volume2 className={`w-4 h-4 ${isPlayingAudio ? 'animate-bounce' : ''}`} />
+                      <span>{isPlayingAudio ? 'Озвучую...' : 'Послухати оригінал'}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Check / Feedback */}
+                {isSentenceCorrect === null ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCheckSentence}
+                      disabled={assembledWords.length === 0}
+                      className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-[#d4af37] to-[#e5a93b] hover:from-[#e5c158] hover:to-[#f0b542] disabled:opacity-40 disabled:cursor-not-allowed text-[#0a0e17] font-serif-vintage font-bold text-sm shadow-xl transition-all active:scale-98 cursor-pointer"
+                    >
+                      Перевірити записку
+                    </button>
+                    <button
+                      onClick={handleResetSentence}
+                      className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs transition-all cursor-pointer"
+                    >
+                      Скинути
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 animate-in fade-in">
+                    <div className={`p-3.5 rounded-2xl border-2 flex items-start gap-3 text-xs sm:text-sm font-serif-vintage ${
+                      isSentenceCorrect 
+                        ? 'bg-emerald-950/50 border-emerald-500 text-emerald-200' 
+                        : 'bg-red-950/50 border-red-500 text-red-200'
+                    }`}>
+                      {isSentenceCorrect ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      )}
+                      <div className="leading-relaxed">{sentenceFeedback}</div>
+                    </div>
+                    {isSentenceCorrect ? (
+                      <button
+                        onClick={handleNextStep}
+                        className="w-full py-3.5 rounded-2xl bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0e17] font-serif-vintage font-bold text-sm shadow-xl transition-all active:scale-98 cursor-pointer"
+                      >
+                        {currentStepIndex + 1 < detectiveCase.steps.length
+                          ? 'Перейти до наступного етапу →'
+                          : 'Завершити розслідування справи 🏆'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleResetSentence}
+                        className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-mono text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Спробувати відновити записку ще раз
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CRIME SCENE SEARCH (Interactive room investigation) */}
+            {activeStep.type === 'crime_scene_search' && activeStep.crimeScene && (
+              <div className="bg-gradient-to-b from-[#18263e] to-[#0e1626] border-2 border-[#d4af37]/60 rounded-3xl p-5 sm:p-7 shadow-2xl mb-4 animate-in fade-in">
+                {/* Instruction */}
+                <div className="text-xs sm:text-sm text-slate-200 mb-4 font-sans leading-relaxed flex items-center gap-1.5">
+                  <Search className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-amber-400 font-bold">Обшук:</span>
+                  <span>{activeStep.instruction}</span>
+                </div>
+
+                {/* Scene Description */}
+                <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-3">
+                  📍 {activeStep.crimeScene.sceneDescription}
+                </div>
+
+                {/* Interactive Crime Scene Grid */}
+                <div className="relative bg-[#0a0f18] border-2 border-slate-700 rounded-2xl overflow-hidden mb-4 shadow-inner" style={{ aspectRatio: '16/10' }}>
+                  {/* Dark room overlay effect */}
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.6)_100%)] pointer-events-none z-10" />
+                  
+                  {/* Hotspot objects */}
+                  {activeStep.crimeScene.hotspots.map((hotspot) => {
+                    const isRevealed = revealedHotspots.has(hotspot.id);
+                    const isActive = activeHotspot?.id === hotspot.id;
+                    return (
+                      <button
+                        key={hotspot.id}
+                        onClick={() => handleHotspotClick(hotspot)}
+                        className={`absolute z-20 rounded-xl border-2 transition-all duration-300 cursor-pointer flex items-center justify-center text-xs sm:text-sm font-bold ${
+                          isRevealed
+                            ? hotspot.isEvidence
+                              ? 'border-emerald-400 bg-emerald-950/60 text-emerald-300 shadow-lg shadow-emerald-500/20'
+                              : 'border-slate-500 bg-slate-800/60 text-slate-300'
+                            : 'border-slate-700/50 bg-slate-900/30 hover:border-[#d4af37] hover:bg-[#d4af37]/10 text-slate-500 hover:text-[#f5d77f]'
+                        } ${isActive ? 'ring-2 ring-[#d4af37] ring-offset-2 ring-offset-[#0a0f18]' : ''}`}
+                        style={{
+                          left: `${hotspot.position.x}%`,
+                          top: `${hotspot.position.y}%`,
+                          width: `${hotspot.position.width}%`,
+                          height: `${hotspot.position.height}%`,
+                        }}
+                        title={isRevealed ? hotspot.translationUa : 'Натисніть для обшуку'}
+                      >
+                        {isRevealed ? (
+                          <span className="flex flex-col items-center gap-0.5">
+                            <span>{hotspot.isEvidence ? '🔑' : '🔍'}</span>
+                            <span className="text-[9px] sm:text-[10px] font-mono truncate max-w-full px-1">{hotspot.objectName}</span>
+                          </span>
+                        ) : (
+                          <MousePointerClick className="w-4 h-4 sm:w-5 sm:h-5 opacity-40" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Active Hotspot Detail Card */}
+                {activeHotspot && (
+                  <div className={`p-4 rounded-2xl border-2 mb-4 animate-in fade-in ${
+                    activeHotspot.isEvidence
+                      ? 'bg-emerald-950/40 border-emerald-500'
+                      : 'bg-[#172338] border-slate-600'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-mono uppercase tracking-wider text-slate-400">
+                        {activeHotspot.isEvidence ? '🔑 КЛЮЧОВА УЛИКА ЗНАЙДЕНА!' : `🔍 ${activeHotspot.objectName}`}
+                      </span>
+                      {activeStep.audioText && (
+                        <button
+                          onClick={() => {
+                            setIsPlayingAudio(true);
+                            soundEngine.speakBulgarian(activeHotspot.wordBg, () => setIsPlayingAudio(false));
+                          }}
+                          className="px-2 py-1 rounded-lg bg-[#d4af37] text-[#0a0e17] font-mono text-[10px] font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Volume2 className={`w-3 h-3 ${isPlayingAudio ? 'animate-bounce' : ''}`} />
+                          Вимова
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-center py-2">
+                      <div className="text-xl sm:text-2xl font-bold text-[#f5d77f] font-serif-vintage">{activeHotspot.wordBg}</div>
+                      <div className="text-xs font-mono text-cyan-300">{activeHotspot.transcription}</div>
+                      <div className="text-sm font-semibold text-emerald-400 mt-1">= {activeHotspot.translationUa}</div>
+                    </div>
+                    {activeHotspot.poirotHint && (
+                      <div className="mt-2 p-2 rounded-xl bg-[#0a0f18] border border-slate-700 text-xs text-slate-300 font-serif italic">
+                        🕵️♂️ Пуаро: «{activeHotspot.poirotHint}»
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Progress indicator */}
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-3">
+                  <span>Обстежено: {revealedHotspots.size} / {activeStep.crimeScene.hotspots.length} об'єктів</span>
+                  {foundEvidence && <span className="text-emerald-400 font-bold">✓ Ключову улику знайдено!</span>}
+                </div>
+
+                {/* Proceed button (only after finding evidence) */}
+                {foundEvidence && (
+                  <button
+                    onClick={handleNextStep}
+                    className="w-full py-3.5 rounded-2xl bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0e17] font-serif-vintage font-bold text-sm shadow-xl transition-all active:scale-98 cursor-pointer animate-in fade-in"
+                  >
+                    {currentStepIndex + 1 < detectiveCase.steps.length
+                      ? 'Улику здобуто! Перейти далі →'
+                      : 'Завершити розслідування справи 🏆'}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* MATCHING PAIRS (Connect Bulgarian and Ukrainian pairs with red yarn) */}
+            {activeStep.type === 'matching_pairs' && activeStep.matchingPairs && (
+              <div className="bg-gradient-to-b from-[#18263e] to-[#0e1626] border-2 border-[#d4af37]/60 rounded-3xl p-5 sm:p-7 shadow-2xl mb-4 animate-in fade-in">
+                {/* Instruction */}
+                <div className="text-xs sm:text-sm text-slate-200 mb-4 font-sans leading-relaxed flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-amber-400 font-bold">З'єднайте пари:</span>
+                  <span>{activeStep.instruction}</span>
+                </div>
+
+                {/* Columns */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                  {/* Left Column: Bulgarian Words */}
+                  <div className="space-y-2.5">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-amber-400/80 mb-1 flex items-center gap-1">
+                      <span>🇧🇬 Болгарські поняття:</span>
+                    </div>
+                    {activeStep.matchingPairs.map((pair) => {
+                      const isMatched = matchedPairIds.has(pair.id);
+                      const isSelected = selectedBulgarianId === pair.id;
+
+                      let btnStyle = 'border-slate-700 bg-[#152033] hover:border-[#d4af37] text-slate-200';
+                      if (isMatched) {
+                        btnStyle = 'border-emerald-500 bg-emerald-950/40 text-emerald-300 opacity-80 cursor-default';
+                      } else if (isSelected) {
+                        btnStyle = pairMismatch
+                          ? 'border-red-500 bg-red-950/40 text-red-200 ring-2 ring-red-500'
+                          : 'border-[#d4af37] bg-[#223352] text-[#f5d77f] ring-2 ring-[#d4af37]';
+                      }
+
+                      return (
+                        <button
+                          key={`bg-${pair.id}`}
+                          onClick={() => handleSelectBulgarian(pair.id)}
+                          disabled={isMatched}
+                          className={`w-full p-3 rounded-2xl border-2 font-serif-vintage text-xs sm:text-sm font-bold flex items-center justify-between transition-all duration-200 cursor-pointer ${btnStyle}`}
+                        >
+                          <span>{pair.bulgarian}</span>
+                          {isMatched && <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Right Column: Shuffled Ukrainian Words */}
+                  <div className="space-y-2.5">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-cyan-400/80 mb-1 flex items-center gap-1">
+                      <span>🇺🇦 Український переклад:</span>
+                    </div>
+                    {shuffledUkrainian.map((item) => {
+                      const isMatched = matchedPairIds.has(item.id);
+                      const isSelected = selectedUkrainianId === item.id;
+
+                      let btnStyle = 'border-slate-700 bg-[#152033] hover:border-[#d4af37] text-slate-200';
+                      if (isMatched) {
+                        btnStyle = 'border-emerald-500 bg-emerald-950/40 text-emerald-300 opacity-80 cursor-default';
+                      } else if (isSelected) {
+                        btnStyle = pairMismatch
+                          ? 'border-red-500 bg-red-950/40 text-red-200 ring-2 ring-red-500'
+                          : 'border-cyan-400 bg-[#1a2f4a] text-cyan-200 ring-2 ring-cyan-400';
+                      }
+
+                      return (
+                        <button
+                          key={`ua-${item.id}`}
+                          onClick={() => handleSelectUkrainian(item.id)}
+                          disabled={isMatched}
+                          className={`w-full p-3 rounded-2xl border-2 font-sans text-xs sm:text-sm transition-all duration-200 cursor-pointer ${btnStyle}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{item.ukrainian}</span>
+                            {isMatched && <span className="text-xs font-mono text-emerald-400">✓ З'єднано</span>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Pairs Progress & Completion */}
+                {matchedPairIds.size === activeStep.matchingPairs.length ? (
+                  <div className="space-y-3 animate-in fade-in">
+                    <div className="p-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-950/40 text-emerald-200 flex items-center gap-2.5 text-xs sm:text-sm font-serif-vintage">
+                      <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <span>Усі пари з'єднані червоною ниткою дедукції! Чудова спостережливість!</span>
+                    </div>
+                    <button
+                      onClick={handleNextStep}
+                      className="w-full py-3.5 rounded-2xl bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0e17] font-serif-vintage font-bold text-sm shadow-xl transition-all active:scale-98 cursor-pointer"
+                    >
+                      {currentStepIndex + 1 < detectiveCase.steps.length
+                        ? 'Перейти до наступного етапу →'
+                        : 'Завершити розслідування справи 🏆'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span>З'єднано ниткою: {matchedPairIds.size} / {activeStep.matchingPairs.length}</span>
+                    <span className="text-[#f5d77f]">Оберіть болгарське слово, потім його переклад</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TIMELINE PUZZLE (Chronological event reconstruction) */}
+            {activeStep.type === 'timeline_puzzle' && activeStep.timelineEvents && (
+              <div className="bg-gradient-to-b from-[#18263e] to-[#0e1626] border-2 border-[#d4af37]/60 rounded-3xl p-5 sm:p-7 shadow-2xl mb-4 animate-in fade-in">
+                {/* Instruction */}
+                <div className="text-xs sm:text-sm text-slate-200 mb-4 font-sans leading-relaxed flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-amber-400 font-bold">Хронологія:</span>
+                  <span>{activeStep.instruction}</span>
+                </div>
+
+                {/* Timeline Events List */}
+                <div className="space-y-3 mb-5">
+                  {timelineEvents.map((ev, idx) => {
+                    const isFirst = idx === 0;
+                    const isLast = idx === timelineEvents.length - 1;
+
+                    return (
+                      <div
+                        key={ev.id}
+                        className="p-3 sm:p-4 rounded-2xl border-2 border-slate-700 bg-[#152033] flex items-center justify-between gap-3 shadow-md hover:border-[#d4af37]/70 transition-all"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-7 h-7 rounded-xl bg-slate-800 border border-[#d4af37]/40 font-mono text-xs font-bold text-[#f5d77f] flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="font-serif-vintage font-bold text-xs sm:text-sm text-[#f5d77f]">
+                              {ev.textBg}
+                            </div>
+                            <div className="text-[11px] sm:text-xs text-slate-300 font-sans mt-0.5">
+                              {ev.textUa}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Up / Down Controls */}
+                        {!isTimelineCorrect && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => handleMoveTimelineItem(idx, 'up')}
+                              disabled={isFirst}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 transition-colors"
+                              title="Перемістити раніше"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleMoveTimelineItem(idx, 'down')}
+                              disabled={isLast}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300 transition-colors"
+                              title="Перемістити пізніше"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Validation Actions */}
+                {!isTimelineSubmitted ? (
+                  <button
+                    onClick={handleCheckTimeline}
+                    className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#d4af37] to-[#e5a93b] hover:from-[#e5c158] hover:to-[#f0b542] text-[#0a0e17] font-serif-vintage font-bold text-sm sm:text-base shadow-xl transition-all active:scale-98 cursor-pointer"
+                  >
+                    Звірити хронологію подій
+                  </button>
+                ) : (
+                  <div className="space-y-3 animate-in fade-in">
+                    <div className={`p-3.5 rounded-2xl border-2 flex items-start gap-3 text-xs sm:text-sm font-serif-vintage ${
+                      isTimelineCorrect
+                        ? 'bg-emerald-950/50 border-emerald-500 text-emerald-200'
+                        : 'bg-red-950/50 border-red-500 text-red-200'
+                    }`}>
+                      {isTimelineCorrect ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                      )}
+                      <div className="leading-relaxed">{timelineFeedback}</div>
+                    </div>
+
+                    {isTimelineCorrect ? (
+                      <button
+                        onClick={handleNextStep}
+                        className="w-full py-3.5 rounded-2xl bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0e17] font-serif-vintage font-bold text-sm shadow-xl transition-all active:scale-98 cursor-pointer"
+                      >
+                        {currentStepIndex + 1 < detectiveCase.steps.length
+                          ? 'Перейти до наступного етапу →'
+                          : 'Завершити розслідування справи 🏆'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleResetTimeline}
+                        className="w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-mono text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Спробувати відновити порядок знову
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* WITNESS / SUSPECT DIALOGUE (FOR OTHER STEP TYPES) */}
-            {activeStep.type !== 'theory_intro' && (
+            {activeStep.type !== 'theory_intro' && activeStep.type !== 'sentence_assembly' && activeStep.type !== 'crime_scene_search' && activeStep.type !== 'matching_pairs' && activeStep.type !== 'timeline_puzzle' && (
               <>
                 {/* Character Speech Bar if testimony / interrogation */}
                 {activeStep.characterName !== 'Еркюль Пуаро' && (
@@ -421,7 +1133,7 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
           </div>
 
           {/* Action Footer for Practice / Interrogation steps */}
-          {activeStep.type !== 'theory_intro' && (
+          {activeStep.type !== 'theory_intro' && activeStep.type !== 'sentence_assembly' && activeStep.type !== 'crime_scene_search' && activeStep.type !== 'matching_pairs' && activeStep.type !== 'timeline_puzzle' && (
             <div className="mt-5 pt-4 border-t border-[#d4af37]/20">
               {!isAnswerSubmitted ? (
                 <button
@@ -520,6 +1232,31 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
           >
             Занести докази до Особистої справи
           </button>
+        </div>
+      )}
+
+      {/* Exhausted Attempts Modal (Poirot encourages taking a breath) */}
+      {showExhaustedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#121a28] border-2 border-[#d4af37] rounded-3xl p-6 max-w-md w-full shadow-2xl text-center font-serif">
+            <div className="text-4xl mb-3">🕵️‍♂️🧠</div>
+            <h3 className="font-serif-vintage font-bold text-lg text-[#f5d77f] mb-2">
+              «Mon cher ami! Сірі клітинки втомилися!»
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-5">
+              Навіть найвидатніший детектив робить помилки. Зробіть глибокий вдих, прислухайтеся до інтуїції Пуаро та спробуйте ще раз!
+            </p>
+            <button
+              onClick={() => {
+                soundEngine.playPageTurn();
+                setAttemptsLeft(3);
+                setShowExhaustedModal(false);
+              }}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#d4af37] to-[#e5a93b] hover:from-[#e5c158] hover:to-[#f0b542] text-[#0a0e17] font-bold text-sm font-serif-vintage shadow-xl transition-all cursor-pointer"
+            >
+              Перевести подих (+3 спроби) ➔
+            </button>
+          </div>
         </div>
       )}
     </div>

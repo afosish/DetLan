@@ -52,23 +52,57 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
 
       {/* Main Corkboard Area */}
       <div className="relative corkboard-pattern p-5 sm:p-8 rounded-3xl border-4 border-[#523315] shadow-2xl min-h-[520px] flex flex-col justify-between overflow-hidden">
-        {/* Subtle decorative Red Yarn strings across board */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-80 z-0">
+        {/* Dynamic SVG Red Yarn strings connecting pins */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
           <defs>
-            <filter id="yarn-shadow" x="-10%" y="-10%" width="130%" height="130%">
-              <feDropShadow dx="1" dy="3" stdDeviation="2" floodColor="#000" floodOpacity="0.5"/>
+            <filter id="yarn-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="1" dy="3" stdDeviation="3" floodColor="#000" floodOpacity="0.6"/>
+            </filter>
+            <filter id="yarn-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#e53e3e" floodOpacity="0.8"/>
             </filter>
           </defs>
-          <line x1="22%" y1="28%" x2="52%" y2="28%" stroke="#e53e3e" strokeWidth="2.5" strokeDasharray="6,3" filter="url(#yarn-shadow)"/>
-          <line x1="52%" y1="28%" x2="80%" y2="35%" stroke="#c53030" strokeWidth="2.5" filter="url(#yarn-shadow)"/>
-          <line x1="22%" y1="28%" x2="40%" y2="75%" stroke="#b91c1c" strokeWidth="2" strokeDasharray="4,4" filter="url(#yarn-shadow)"/>
+
+          {/* Decorative ambient strings */}
+          <line x1="15%" y1="12%" x2="48%" y2="18%" stroke="#b91c1c" strokeWidth="2" strokeDasharray="5,4" filter="url(#yarn-shadow)"/>
+          <line x1="48%" y1="18%" x2="85%" y2="15%" stroke="#991b1b" strokeWidth="2" opacity="0.6" filter="url(#yarn-shadow)"/>
+          <line x1="85%" y1="15%" x2="52%" y2="85%" stroke="#7f1d1d" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.4"/>
+
+          {/* Dynamic Evidence Yarn connecting Case 1 to Case 2 */}
+          {profile.completedEpisodes.includes('case-01-missing-key') || profile.unlockedClues.includes('Ключ від мансарди') ? (
+            <g filter="url(#yarn-glow)">
+              <line
+                x1="25%"
+                y1="32%"
+                x2="65%"
+                y2="32%"
+                stroke="#ef4444"
+                strokeWidth="3.5"
+                filter="url(#yarn-shadow)"
+              />
+              <circle cx="25%" cy="32%" r="4.5" fill="#dc2626" />
+              <circle cx="65%" cy="32%" r="4.5" fill="#dc2626" />
+            </g>
+          ) : (
+            <line
+              x1="25%"
+              y1="32%"
+              x2="65%"
+              y2="32%"
+              stroke="#f87171"
+              strokeWidth="2"
+              strokeDasharray="6,4"
+              className="opacity-40"
+              filter="url(#yarn-shadow)"
+            />
+          )}
         </svg>
 
         {/* Cases Grid */}
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cases.map((detCase, idx) => {
             const isCompleted = profile.completedEpisodes.includes(detCase.id) || (profile.xp >= 100 && idx === 0 && profile.completedEpisodes.length > 0);
-            const isUnlocked = profile.xp >= detCase.requiredXp;
+            const isUnlocked = profile.xp >= detCase.requiredXp || (detCase.requiredClue && profile.unlockedClues.includes(detCase.requiredClue)) || (idx > 0 && profile.completedEpisodes.includes(cases[idx - 1]?.id));
 
             return (
               <div
@@ -112,9 +146,9 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
                       АКТИВНЕ
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-slate-600 font-bold bg-slate-200 px-2 py-0.5 rounded-full">
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>{detCase.requiredXp} XP</span>
+                    <span className="flex items-center gap-1 text-slate-600 font-bold bg-slate-200 px-2 py-0.5 rounded-full text-[10px]">
+                      <Lock className="w-3 h-3" />
+                      <span>{detCase.requiredClue ? `Потрібен ${detCase.requiredClue}` : `${detCase.requiredXp} XP`}</span>
                     </span>
                   )}
                 </div>
@@ -147,8 +181,8 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
                       <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   ) : (
-                    <div className="text-slate-400 font-mono text-[10px]">
-                      Потрібно {detCase.requiredXp} XP
+                    <div className="text-slate-500 font-mono text-[10px]">
+                      {detCase.requiredClue ? `Потрібна улика: ${detCase.requiredClue}` : `Потрібно ${detCase.requiredXp} XP`}
                     </div>
                   )}
                 </div>
