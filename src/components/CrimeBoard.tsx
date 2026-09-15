@@ -131,7 +131,7 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
                 </div>
 
                 {/* Description */}
-                <p className="text-xs text-slate-700 leading-relaxed line-clamp-3 mb-4 font-serif">
+                <p className="text-xs text-slate-700 leading-relaxed mb-4 font-serif">
                   {detCase.description}
                 </p>
 

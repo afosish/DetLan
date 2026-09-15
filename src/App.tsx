@@ -54,7 +54,7 @@ export const App: React.FC = () => {
       setProfile(newProfile);
       if (newProfile && !newProfile.isGuest && newProfile.email) {
         setIsAuthOpen(false);
-        setCurrentView('crime_board');
+        setCurrentView((prev) => (prev === 'landing' ? 'crime_board' : prev));
       }
     });
 

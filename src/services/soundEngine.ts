@@ -4,13 +4,23 @@
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
   private soundEnabled: boolean = true;
+  private volume: number = 0.7; // 0.0 to 1.0
 
   constructor() {
     // Sound is enabled by default, can be toggled
     const stored = localStorage.getItem('detlan_sound_enabled');
     if (stored !== null) {
       this.soundEnabled = stored === 'true';
+    }
+
+    const storedVol = localStorage.getItem('detlan_sound_volume');
+    if (storedVol !== null) {
+      const parsed = parseFloat(storedVol);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+        this.volume = parsed;
+      }
     }
   }
 
@@ -21,6 +31,30 @@ class SoundEngine {
   public setEnabled(val: boolean) {
     this.soundEnabled = val;
     localStorage.setItem('detlan_sound_enabled', String(val));
+    this.updateMasterGain();
+  }
+
+  public getVolume(): number {
+    return this.volume;
+  }
+
+  public setVolume(val: number) {
+    this.volume = Math.max(0, Math.min(1, val));
+    localStorage.setItem('detlan_sound_volume', String(this.volume));
+    if (this.volume > 0 && !this.soundEnabled) {
+      this.soundEnabled = true;
+      localStorage.setItem('detlan_sound_enabled', 'true');
+    }
+    this.updateMasterGain();
+  }
+
+  private updateMasterGain() {
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setValueAtTime(
+        this.soundEnabled ? this.volume : 0,
+        this.ctx.currentTime
+      );
+    }
   }
 
   private initContext() {
@@ -30,9 +64,24 @@ class SoundEngine {
         this.ctx = new AudioCtx();
       }
     }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      if (!this.masterGain) {
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(
+          this.soundEnabled ? this.volume : 0,
+          this.ctx.currentTime
+        );
+        this.masterGain.connect(this.ctx.destination);
+      }
     }
+  }
+
+  private getDestination(): AudioNode {
+    this.initContext();
+    return this.masterGain || (this.ctx ? this.ctx.destination : ({} as AudioNode));
   }
 
   // 1. Vintage Typewriter Click
@@ -59,7 +108,7 @@ class SoundEngine {
 
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestination());
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.06);
@@ -85,7 +134,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.9);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
 
       osc.start(startTime);
       osc.stop(startTime + 0.9);
@@ -109,7 +158,7 @@ class SoundEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestination());
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.3);
@@ -137,7 +186,7 @@ class SoundEngine {
 
     osc1.connect(gain);
     osc2.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestination());
 
     osc1.start();
     osc2.start();
@@ -170,7 +219,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, t + n.d);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestination());
 
       osc.start(t);
       osc.stop(t + n.d + 0.05);
@@ -195,7 +244,7 @@ class SoundEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.28);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestination());
 
     osc.start();
     osc.stop(this.ctx.currentTime + 0.3);
@@ -214,6 +263,7 @@ class SoundEngine {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'bg-BG';
     utterance.rate = 0.88; // Slightly measured, Poirot detective pace
+    utterance.volume = this.soundEnabled ? this.volume : 0;
 
     // Try to find native Bulgarian voice
     const voices = window.speechSynthesis.getVoices();

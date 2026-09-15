@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { DetectiveProfile } from '../services/supabase';
 import { RANKS, type Rank } from '../data/curriculum';
 import { soundEngine } from '../services/soundEngine';
-import { Volume2, VolumeX, Shield, Flame, BookOpen, Award, Download, User as UserIcon } from 'lucide-react';
+import { Volume2, Volume1, VolumeX, Shield, Flame, BookOpen, Award, Download, User as UserIcon } from 'lucide-react';
 
 interface HeaderProps {
   profile: DetectiveProfile;
@@ -24,6 +24,9 @@ export const Header: React.FC<HeaderProps> = ({
   isInsideCase,
 }) => {
   const [soundOn, setSoundOn] = useState(soundEngine.isEnabled());
+  const [volume, setVolume] = useState(soundEngine.getVolume());
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const volumePopoverRef = useRef<HTMLDivElement>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
@@ -37,6 +40,18 @@ export const Header: React.FC<HeaderProps> = ({
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (volumePopoverRef.current && !volumePopoverRef.current.contains(e.target as Node)) {
+        setShowVolumeSlider(false);
+      }
+    };
+    if (showVolumeSlider) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showVolumeSlider]);
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -54,7 +69,26 @@ export const Header: React.FC<HeaderProps> = ({
     const next = !soundOn;
     setSoundOn(next);
     soundEngine.setEnabled(next);
-    if (next) soundEngine.playTypewriter();
+    if (next) {
+      if (volume === 0) {
+        setVolume(0.7);
+        soundEngine.setVolume(0.7);
+      }
+      soundEngine.playTypewriter();
+    }
+  };
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVol = parseFloat(e.target.value);
+    setVolume(newVol);
+    soundEngine.setVolume(newVol);
+    if (newVol > 0 && !soundOn) {
+      setSoundOn(true);
+      soundEngine.setEnabled(true);
+    } else if (newVol === 0 && soundOn) {
+      setSoundOn(false);
+      soundEngine.setEnabled(false);
+    }
   };
 
   // Find current and next rank
@@ -190,14 +224,53 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
 
-          {/* Sound Toggle */}
-          <button
-            onClick={toggleSound}
-            className="p-2 rounded-xl bg-[#172236] hover:bg-[#20304c] border border-slate-700 text-slate-300 transition-colors"
-            title={soundOn ? 'Вимкнути звук' : 'Увімкнути вінтажні звуки'}
-          >
-            {soundOn ? <Volume2 className="w-4 h-4 text-[#d4af37]" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
-          </button>
+          {/* Sound & Volume Control */}
+          <div className="relative" ref={volumePopoverRef}>
+            <button
+              onClick={() => {
+                setShowVolumeSlider(!showVolumeSlider);
+                soundEngine.playTypewriter();
+              }}
+              className="p-2 rounded-xl bg-[#172236] hover:bg-[#20304c] border border-slate-700 text-slate-300 transition-colors flex items-center gap-1"
+              title={`Гучність: ${soundOn ? Math.round(volume * 100) : 0}% (натисніть для налаштування)`}
+            >
+              {!soundOn || volume === 0 ? (
+                <VolumeX className="w-4 h-4 text-slate-500" />
+              ) : volume < 0.5 ? (
+                <Volume1 className="w-4 h-4 text-[#d4af37]" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-[#d4af37]" />
+              )}
+            </button>
+
+            {showVolumeSlider && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-[#121927] border border-[#d4af37]/40 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 font-mono text-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[#d4af37] text-[11px] font-bold">Гучність</span>
+                  <button
+                    onClick={toggleSound}
+                    className="text-[10px] text-slate-400 hover:text-white underline cursor-pointer"
+                  >
+                    {soundOn ? 'Вимкнути' : 'Увімкнути'}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={soundOn ? volume : 0}
+                    onChange={handleVolumeChange}
+                    className="w-full accent-[#d4af37] cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                  />
+                  <span className="text-slate-300 w-8 text-right text-[11px]">
+                    {soundOn ? Math.round(volume * 100) : 0}%
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Profile / Auth Button */}
           {isAuthenticated ? (
