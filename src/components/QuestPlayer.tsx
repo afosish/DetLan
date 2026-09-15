@@ -17,7 +17,6 @@ import {
   AlertTriangle,
   Search,
   GripVertical,
-  MousePointerClick,
   Puzzle,
   ArrowUp,
   ArrowDown
@@ -724,10 +723,20 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
                 </div>
 
                 {/* Interactive Crime Scene Grid */}
-                <div className="relative bg-[#0a0f18] border-2 border-slate-700 rounded-2xl overflow-hidden mb-4 shadow-inner" style={{ aspectRatio: '16/10' }}>
-                  {/* Dark room overlay effect */}
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,rgba(0,0,0,0.6)_100%)] pointer-events-none z-10" />
-                  
+                <div className="relative bg-[#0a0f18] border-2 border-[#d4af37]/60 rounded-2xl overflow-hidden mb-4 shadow-2xl" style={{ aspectRatio: '16/9' }}>
+                  {/* Background illustration */}
+                  {activeStep.crimeScene.backgroundImage && (
+                    <img
+                      src={activeStep.crimeScene.backgroundImage}
+                      alt={activeStep.crimeScene.sceneDescription}
+                      className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+                    />
+                  )}
+
+                  {/* Atmospheric Noir Lighting Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none z-10" />
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.5)_100%)] pointer-events-none z-10" />
+
                   {/* Hotspot objects */}
                   {activeStep.crimeScene.hotspots.map((hotspot) => {
                     const isRevealed = revealedHotspots.has(hotspot.id);
@@ -736,28 +745,30 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
                       <button
                         key={hotspot.id}
                         onClick={() => handleHotspotClick(hotspot)}
-                        className={`absolute z-20 rounded-xl border-2 transition-all duration-300 cursor-pointer flex items-center justify-center text-xs sm:text-sm font-bold ${
+                        className={`absolute z-20 rounded-xl transition-all duration-300 cursor-pointer flex items-center justify-center font-bold ${
                           isRevealed
                             ? hotspot.isEvidence
-                              ? 'border-emerald-400 bg-emerald-950/60 text-emerald-300 shadow-lg shadow-emerald-500/20'
-                              : 'border-slate-500 bg-slate-800/60 text-slate-300'
-                            : 'border-slate-700/50 bg-slate-900/30 hover:border-[#d4af37] hover:bg-[#d4af37]/10 text-slate-500 hover:text-[#f5d77f]'
-                        } ${isActive ? 'ring-2 ring-[#d4af37] ring-offset-2 ring-offset-[#0a0f18]' : ''}`}
+                              ? 'border-2 border-emerald-400 bg-emerald-950/85 text-emerald-200 shadow-xl shadow-emerald-500/40 ring-2 ring-emerald-300'
+                              : 'border-2 border-amber-400/80 bg-[#0f172a]/85 text-amber-200 shadow-lg'
+                            : 'border-2 border-dashed border-[#d4af37]/70 bg-black/40 hover:border-[#f5d77f] hover:bg-[#d4af37]/25 text-amber-300 hover:scale-105 shadow-md backdrop-blur-[1px]'
+                        } ${isActive ? 'ring-2 ring-white ring-offset-2 ring-offset-black scale-105' : ''}`}
                         style={{
                           left: `${hotspot.position.x}%`,
                           top: `${hotspot.position.y}%`,
                           width: `${hotspot.position.width}%`,
                           height: `${hotspot.position.height}%`,
                         }}
-                        title={isRevealed ? hotspot.translationUa : 'Натисніть для обшуку'}
+                        title={isRevealed ? `${hotspot.wordBg} (${hotspot.translationUa})` : 'Натисніть для огляду'}
                       >
                         {isRevealed ? (
-                          <span className="flex flex-col items-center gap-0.5">
-                            <span>{hotspot.isEvidence ? '🔑' : '🔍'}</span>
-                            <span className="text-[9px] sm:text-[10px] font-mono truncate max-w-full px-1">{hotspot.objectName}</span>
+                          <span className="flex flex-col items-center gap-0.5 px-1 text-center">
+                            <span className="text-xs sm:text-base">{hotspot.isEvidence ? '🔑' : '🔍'}</span>
+                            <span className="text-[9px] sm:text-[11px] font-mono truncate max-w-full font-bold">{hotspot.wordBg}</span>
                           </span>
                         ) : (
-                          <MousePointerClick className="w-4 h-4 sm:w-5 sm:h-5 opacity-40" />
+                          <span className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/60 border border-[#d4af37]/80 text-[#f5d77f] shadow-lg animate-pulse">
+                            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          </span>
                         )}
                       </button>
                     );
