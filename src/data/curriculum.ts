@@ -325,7 +325,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '🎙️',
     title: '«Чисте зізнання»',
     description: 'Пройти розмовний етап допиту без помилок та чернеток.',
-    unlocked: true, // starts unlocked for motivation
+    unlocked: false,
     category: 'speech',
   },
   {

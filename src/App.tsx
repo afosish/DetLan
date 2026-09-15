@@ -4,6 +4,7 @@ import { LandingPage } from './components/LandingPage';
 import { CrimeBoard } from './components/CrimeBoard';
 import { QuestPlayer } from './components/QuestPlayer';
 import { AuthModal } from './components/AuthModal';
+import { ProfileModal } from './components/ProfileModal';
 import { DossierNotebook } from './components/DossierNotebook';
 import { AchievementsModal } from './components/AchievementsModal';
 import { DailyTrainingModal } from './components/DailyTrainingModal';
@@ -12,6 +13,8 @@ import {
   getLocalProfile, 
   saveLocalProfile, 
   subscribeToAuthChanges, 
+  signOutUser,
+  resetUserProfile,
   DEFAULT_GUEST_PROFILE,
   type DetectiveProfile 
 } from './services/supabase';
@@ -26,6 +29,7 @@ export const App: React.FC = () => {
 
   // Modal states
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotebookOpen, setIsNotebookOpen] = useState(false);
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const [isDailyOpen, setIsDailyOpen] = useState(false);
@@ -123,6 +127,7 @@ export const App: React.FC = () => {
         onOpenNotebook={() => setIsNotebookOpen(true)}
         onOpenAchievements={() => setIsAchievementsOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
         onNavigateLanding={() => setCurrentView('landing')}
         isInsideCase={currentView === 'quest'}
       />
@@ -170,9 +175,27 @@ export const App: React.FC = () => {
         onProfileUpdated={updateProfile}
       />
 
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        profile={profile}
+        onLogout={async () => {
+          await signOutUser();
+          setProfile(DEFAULT_GUEST_PROFILE);
+          setIsProfileOpen(false);
+          setCurrentView('landing');
+        }}
+        onResetProgress={() => {
+          const fresh = resetUserProfile(profile.id);
+          setProfile(fresh);
+          setCases(DETECTIVE_CASES);
+        }}
+      />
+
       <DossierNotebook
         isOpen={isNotebookOpen}
         onClose={() => setIsNotebookOpen(false)}
+        profile={profile}
       />
 
       <AchievementsModal

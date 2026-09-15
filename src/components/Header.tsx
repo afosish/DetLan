@@ -9,6 +9,7 @@ interface HeaderProps {
   onOpenNotebook: () => void;
   onOpenAchievements: () => void;
   onOpenAuth: () => void;
+  onOpenProfile: () => void;
   onNavigateLanding: () => void;
   isInsideCase: boolean;
 }
@@ -18,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNotebook,
   onOpenAchievements,
   onOpenAuth,
+  onOpenProfile,
   onNavigateLanding,
   isInsideCase,
 }) => {
@@ -202,10 +204,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={() => {
                 soundEngine.playTypewriter();
-                onOpenAuth();
+                onOpenProfile();
               }}
               className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 bg-[#172236] hover:bg-[#223352] border border-[#d4af37]/40 rounded-xl transition-all"
-              title={profile.email}
+              title={`Особистий профіль: ${profile.name} (${profile.email})`}
             >
               {profile.avatar.startsWith('http') ? (
                 <img src={profile.avatar} alt="avatar" className="w-5 h-5 rounded-full object-cover border border-[#d4af37]" />

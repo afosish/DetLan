@@ -73,7 +73,14 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
         {/* Achievements List */}
         <div className="space-y-3 font-sans">
           {ACHIEVEMENTS.map((ach) => {
-            const isUnlocked = ach.unlocked || (ach.id === 'grey-cells' && profile.disarmedTrapsCount >= 5);
+            const isUnlocked = Boolean(
+              (ach.id === 'grey-cells' && profile.disarmedTrapsCount >= 5) ||
+              (ach.id === 'cold-blooded' && profile.streak >= 7) ||
+              (ach.id === 'clean-confession' && profile.completedEpisodes.length >= 1) ||
+              (ach.id === 'sharp-eye' && profile.unlockedClues.length >= 1) ||
+              (ach.id === 'verdict-delivered' && profile.completedEpisodes.length >= 2) ||
+              ach.unlocked
+            );
 
             return (
               <div

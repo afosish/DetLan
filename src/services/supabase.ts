@@ -40,9 +40,9 @@ export const DEFAULT_GUEST_PROFILE: DetectiveProfile = {
   name: 'Гість',
   avatar: '🕵️‍♂️',
   xp: 0,
-  streak: 1,
+  streak: 0,
   lastActiveDate: new Date().toISOString().split('T')[0],
-  alibiCount: 1,
+  alibiCount: 0,
   completedEpisodes: [],
   unlockedClues: [],
   disarmedTrapsCount: 0,
@@ -113,26 +113,66 @@ export function subscribeToAuthChanges(onProfileChange: (profile: DetectiveProfi
 }
 
 function handleUserSession(user: any, onProfileChange: (profile: DetectiveProfile) => void) {
-  const existing = getLocalProfile();
-  const isSameUser = existing.id === user.id;
+  // Use a user-specific storage key so each Google account has their own isolated progress
+  const userKey = `detlan_profile_${user.id}`;
+  const savedUserData = localStorage.getItem(userKey);
+  
+  let existing: DetectiveProfile | null = null;
+  if (savedUserData) {
+    try {
+      existing = JSON.parse(savedUserData);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Real Google display name and photo
+  const googleName =
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    user.email?.split('@')[0] ||
+    'Детектив';
+
+  const googleAvatar =
+    user.user_metadata?.avatar_url ||
+    user.user_metadata?.picture ||
+    '🕵️‍♂️';
 
   const profile: DetectiveProfile = {
     id: user.id,
     email: user.email || '',
-    name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Детектив',
-    avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || '🕵️‍♂️',
-    xp: isSameUser ? existing.xp : 0,
-    streak: isSameUser ? existing.streak : 1,
+    name: googleName,
+    avatar: googleAvatar,
+    xp: existing ? existing.xp : 0,
+    streak: existing ? existing.streak : 0,
     lastActiveDate: new Date().toISOString().split('T')[0],
-    alibiCount: isSameUser ? existing.alibiCount : 1,
-    completedEpisodes: isSameUser ? existing.completedEpisodes : [],
-    unlockedClues: isSameUser ? existing.unlockedClues : [],
-    disarmedTrapsCount: isSameUser ? existing.disarmedTrapsCount : 0,
+    alibiCount: existing ? existing.alibiCount : 0,
+    completedEpisodes: existing ? existing.completedEpisodes : [],
+    unlockedClues: existing ? existing.unlockedClues : [],
+    disarmedTrapsCount: existing ? existing.disarmedTrapsCount : 0,
     isGuest: false,
   };
 
-  saveLocalProfile(profile);
+  localStorage.setItem(userKey, JSON.stringify(profile));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
   onProfileChange(profile);
+}
+
+export function resetUserProfile(userId: string): DetectiveProfile {
+  const current = getLocalProfile();
+  const resetProfile: DetectiveProfile = {
+    ...current,
+    id: userId,
+    xp: 0,
+    streak: 0,
+    alibiCount: 0,
+    completedEpisodes: [],
+    unlockedClues: [],
+    disarmedTrapsCount: 0,
+  };
+  localStorage.setItem(`detlan_profile_${userId}`, JSON.stringify(resetProfile));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(resetProfile));
+  return resetProfile;
 }
 
 // Google OAuth Login - REAL GOOGLE AUTH ONLY
