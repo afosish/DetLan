@@ -1,9 +1,12 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+declare const process: any;
+
 const supabaseUrl =
   (import.meta.env.VITE_SUPABASE_URL as string) ||
   (import.meta.env.NEXT_PUBLIC_SUPABASE_URL as string) ||
   (import.meta.env.SUPABASE_URL as string) ||
+  (typeof process !== 'undefined' && process?.env ? (process.env.VITE_SUPABASE_URL as string) : '') ||
   '';
 
 const supabaseAnonKey =
@@ -11,6 +14,7 @@ const supabaseAnonKey =
   (import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string) ||
   (import.meta.env.SUPABASE_ANON_KEY as string) ||
   (import.meta.env.SUPABASE_PUBLISHABLE_KEY as string) ||
+  (typeof process !== 'undefined' && process?.env ? (process.env.VITE_SUPABASE_ANON_KEY as string) : '') ||
   '';
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
@@ -77,6 +81,16 @@ export function getLocalProfile(): DetectiveProfile {
 }
 
 export function saveLocalProfile(profile: DetectiveProfile) {
+  if (
+    !profile ||
+    !profile.email ||
+    profile.email.includes('detlan.app') ||
+    profile.email.includes('investigator.google') ||
+    profile.name === 'Детектив Google' ||
+    profile.id === 'guest-detective-007'
+  ) {
+    return;
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
 }
 
@@ -113,6 +127,15 @@ export function subscribeToAuthChanges(onProfileChange: (profile: DetectiveProfi
 }
 
 function handleUserSession(user: any, onProfileChange: (profile: DetectiveProfile) => void) {
+  if (
+    !user ||
+    user.email?.includes('detlan.app') ||
+    user.email?.includes('investigator.google') ||
+    user.id === 'guest-detective-007'
+  ) {
+    return;
+  }
+
   // Use a user-specific storage key so each Google account has their own isolated progress
   const userKey = `detlan_profile_${user.id}`;
   const savedUserData = localStorage.getItem(userKey);
