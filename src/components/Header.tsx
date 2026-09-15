@@ -201,7 +201,11 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 bg-[#172236] hover:bg-[#223352] border border-[#d4af37]/40 rounded-xl transition-all"
             title={profile.isGuest ? 'Увійти в акаунт' : profile.email}
           >
-            <span className="text-base">{profile.avatar}</span>
+            {profile.avatar.startsWith('http') ? (
+              <img src={profile.avatar} alt="avatar" className="w-5 h-5 rounded-full object-cover border border-[#d4af37]" />
+            ) : (
+              <span className="text-base">{profile.avatar}</span>
+            )}
             <span className="text-xs text-[#d4af37] font-medium hidden md:inline max-w-[90px] truncate">
               {profile.name}
             </span>
