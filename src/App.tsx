@@ -8,7 +8,13 @@ import { DossierNotebook } from './components/DossierNotebook';
 import { AchievementsModal } from './components/AchievementsModal';
 import { DailyTrainingModal } from './components/DailyTrainingModal';
 import { DETECTIVE_CASES, type DetectiveCase } from './data/curriculum';
-import { getLocalProfile, saveLocalProfile, subscribeToAuthChanges, type DetectiveProfile } from './services/supabase';
+import { 
+  getLocalProfile, 
+  saveLocalProfile, 
+  subscribeToAuthChanges, 
+  DEFAULT_GUEST_PROFILE,
+  type DetectiveProfile 
+} from './services/supabase';
 import { soundEngine } from './services/soundEngine';
 import { registerServiceWorker } from './registerSW';
 
@@ -24,11 +30,30 @@ export const App: React.FC = () => {
   const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
   const [isDailyOpen, setIsDailyOpen] = useState(false);
 
+  const isAuthenticated = !profile.isGuest && Boolean(profile.email);
+
   useEffect(() => {
     registerServiceWorker();
+
+    // Purge any stale mock accounts from previous runs
+    try {
+      const stored = localStorage.getItem('detlan_detective_profile');
+      if (stored && (stored.includes('detlan.app') || stored.includes('investigator.google') || stored.includes('guest-detective-007'))) {
+        localStorage.removeItem('detlan_detective_profile');
+        setProfile(DEFAULT_GUEST_PROFILE);
+      }
+    } catch {
+      // ignore
+    }
+
     const unsubscribe = subscribeToAuthChanges((newProfile) => {
       setProfile(newProfile);
+      if (newProfile && !newProfile.isGuest && newProfile.email) {
+        setIsAuthOpen(false);
+        setCurrentView('crime_board');
+      }
     });
+
     return () => {
       unsubscribe();
     };
@@ -40,6 +65,11 @@ export const App: React.FC = () => {
   };
 
   const handleSelectCase = (c: DetectiveCase) => {
+    if (!isAuthenticated) {
+      soundEngine.playTypewriter();
+      setIsAuthOpen(true);
+      return;
+    }
     setActiveCase(c);
     setCurrentView('quest');
   };
@@ -102,10 +132,14 @@ export const App: React.FC = () => {
         {currentView === 'landing' && (
           <LandingPage
             onStartGame={() => {
-              soundEngine.playTypewriter();
-              setCurrentView('crime_board');
+              if (!isAuthenticated) {
+                soundEngine.playTypewriter();
+                setIsAuthOpen(true);
+              } else {
+                soundEngine.playClueFound();
+                setCurrentView('crime_board');
+              }
             }}
-            onOpenAuth={() => setIsAuthOpen(true)}
           />
         )}
 

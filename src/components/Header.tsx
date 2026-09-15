@@ -69,6 +69,8 @@ export const Header: React.FC<HeaderProps> = ({
     Math.max(0, Math.round(((profile.xp - prevRankXp) / (nextRankXp - prevRankXp)) * 100))
   );
 
+  const isAuthenticated = !profile.isGuest && Boolean(profile.email);
+
   return (
     <header className="sticky top-0 z-40 bg-[#0d1422]/95 backdrop-blur-md border-b border-[#d4af37]/30 shadow-xl px-3 sm:px-6 py-2.5 transition-all">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
@@ -98,8 +100,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Gamification Stats: Rank, XP, Streak, Alibi */}
-        {!isInsideCase && (
+        {/* Gamification Stats: Rank, XP, Streak, Alibi - ONLY FOR AUTHENTICATED USERS */}
+        {isAuthenticated && !isInsideCase && (
           <div className="flex items-center gap-2 sm:gap-4 bg-[#141e30] border border-[#2b3c5a] px-2 sm:px-4 py-1.5 rounded-2xl shadow-inner text-xs sm:text-sm">
             {/* Detective Rank & XP */}
             <div className="flex items-center gap-2">
@@ -143,45 +145,48 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
-        {/* Action Controls: Notebook, Achievements, Sound, Install PWA, Auth */}
+        {/* Action Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* PWA Install Button */}
           {isInstallable && (
             <button
               onClick={handleInstallClick}
               className="flex items-center gap-1 bg-[#d4af37] hover:bg-[#e5c158] text-[#0a0e17] px-2.5 py-1.5 rounded-xl font-semibold text-xs transition-all shadow-md active:scale-95 animate-bounce"
-              title="Встановити DetLan як PWA додаток"
+              title="Встановити DetLan як додаток"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden md:inline">Встановити</span>
             </button>
           )}
 
-          {/* Detective Notebook */}
-          <button
-            onClick={() => {
-              soundEngine.playClueFound();
-              onOpenNotebook();
-            }}
-            className="p-2 sm:px-3 sm:py-1.5 bg-[#172236] hover:bg-[#20304c] text-[#e2e8f0] border border-[#d4af37]/30 rounded-xl flex items-center gap-1.5 text-xs transition-all active:scale-95"
-            title="Записник доказів та хибних слів"
-          >
-            <BookOpen className="w-4 h-4 text-[#d4af37]" />
-            <span className="hidden sm:inline font-medium">Записник</span>
-          </button>
+          {/* Detective Notebook & Achievements - ONLY FOR AUTHENTICATED USERS */}
+          {isAuthenticated && (
+            <>
+              <button
+                onClick={() => {
+                  soundEngine.playClueFound();
+                  onOpenNotebook();
+                }}
+                className="p-2 sm:px-3 sm:py-1.5 bg-[#172236] hover:bg-[#20304c] text-[#e2e8f0] border border-[#d4af37]/30 rounded-xl flex items-center gap-1.5 text-xs transition-all active:scale-95"
+                title="Записник доказів та хибних слів"
+              >
+                <BookOpen className="w-4 h-4 text-[#d4af37]" />
+                <span className="hidden sm:inline font-medium">Записник</span>
+              </button>
 
-          {/* Achievements */}
-          <button
-            onClick={() => {
-              soundEngine.playClueFound();
-              onOpenAchievements();
-            }}
-            className="p-2 sm:px-3 sm:py-1.5 bg-[#172236] hover:bg-[#20304c] text-[#e2e8f0] border border-[#d4af37]/30 rounded-xl flex items-center gap-1.5 text-xs transition-all active:scale-95"
-            title="Особиста справа та значки"
-          >
-            <Award className="w-4 h-4 text-[#e5c158]" />
-            <span className="hidden sm:inline font-medium">Значки</span>
-          </button>
+              <button
+                onClick={() => {
+                  soundEngine.playClueFound();
+                  onOpenAchievements();
+                }}
+                className="p-2 sm:px-3 sm:py-1.5 bg-[#172236] hover:bg-[#20304c] text-[#e2e8f0] border border-[#d4af37]/30 rounded-xl flex items-center gap-1.5 text-xs transition-all active:scale-95"
+                title="Особиста справа та значки"
+              >
+                <Award className="w-4 h-4 text-[#e5c158]" />
+                <span className="hidden sm:inline font-medium">Значки</span>
+              </button>
+            </>
+          )}
 
           {/* Sound Toggle */}
           <button
@@ -193,24 +198,37 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {/* Profile / Auth Button */}
-          <button
-            onClick={() => {
-              soundEngine.playTypewriter();
-              onOpenAuth();
-            }}
-            className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 bg-[#172236] hover:bg-[#223352] border border-[#d4af37]/40 rounded-xl transition-all"
-            title={profile.isGuest ? 'Увійти в акаунт' : profile.email}
-          >
-            {profile.avatar.startsWith('http') ? (
-              <img src={profile.avatar} alt="avatar" className="w-5 h-5 rounded-full object-cover border border-[#d4af37]" />
-            ) : (
-              <span className="text-base">{profile.avatar}</span>
-            )}
-            <span className="text-xs text-[#d4af37] font-medium hidden md:inline max-w-[90px] truncate">
-              {profile.name}
-            </span>
-            <UserIcon className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
-          </button>
+          {isAuthenticated ? (
+            <button
+              onClick={() => {
+                soundEngine.playTypewriter();
+                onOpenAuth();
+              }}
+              className="flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 bg-[#172236] hover:bg-[#223352] border border-[#d4af37]/40 rounded-xl transition-all"
+              title={profile.email}
+            >
+              {profile.avatar.startsWith('http') ? (
+                <img src={profile.avatar} alt="avatar" className="w-5 h-5 rounded-full object-cover border border-[#d4af37]" />
+              ) : (
+                <span className="text-base">{profile.avatar}</span>
+              )}
+              <span className="text-xs text-[#d4af37] font-medium hidden md:inline max-w-[90px] truncate">
+                {profile.name}
+              </span>
+              <UserIcon className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                soundEngine.playTypewriter();
+                onOpenAuth();
+              }}
+              className="px-3.5 py-1.5 bg-gradient-to-r from-[#d4af37] to-[#e5a93b] hover:from-[#e5c158] hover:to-[#f0b542] text-[#0a0e17] rounded-xl font-serif-vintage font-bold text-xs shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+            >
+              <UserIcon className="w-3.5 h-3.5" />
+              <span>Увійти</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

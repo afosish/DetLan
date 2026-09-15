@@ -47,7 +47,14 @@ export function getLocalProfile(): DetectiveProfile {
     try {
       const parsed = JSON.parse(data);
       // Clean up any old mock data
-      if (parsed.email?.includes('detlan.app') || parsed.id === 'guest-detective-007') {
+      if (
+        !parsed.email ||
+        parsed.email.includes('detlan.app') || 
+        parsed.id === 'guest-detective-007' ||
+        parsed.name === 'Детектив Google' ||
+        parsed.name === 'Еркюль Пуаро' ||
+        parsed.email === 'investigator.google@detlan.app'
+      ) {
         localStorage.removeItem(STORAGE_KEY);
         return DEFAULT_GUEST_PROFILE;
       }
