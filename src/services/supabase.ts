@@ -25,17 +25,17 @@ export interface DetectiveProfile {
 }
 
 export const DEFAULT_GUEST_PROFILE: DetectiveProfile = {
-  id: 'guest-detective-007',
-  email: 'detective.poirot@detlan.app',
-  name: 'Еркюль Пуаро',
+  id: 'guest',
+  email: '',
+  name: 'Гість',
   avatar: '🕵️‍♂️',
-  xp: 45, // starts with preliminary clues
-  streak: 3,
+  xp: 0,
+  streak: 1,
   lastActiveDate: new Date().toISOString().split('T')[0],
-  alibiCount: 2, // 2 free alibis for peace of mind
+  alibiCount: 1,
   completedEpisodes: [],
-  unlockedClues: ['hotel_key_note'],
-  disarmedTrapsCount: 1,
+  unlockedClues: [],
+  disarmedTrapsCount: 0,
   isGuest: true,
 };
 
@@ -45,7 +45,13 @@ export function getLocalProfile(): DetectiveProfile {
   const data = localStorage.getItem(STORAGE_KEY);
   if (data) {
     try {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Clean up any old mock data
+      if (parsed.email?.includes('detlan.app') || parsed.id === 'guest-detective-007') {
+        localStorage.removeItem(STORAGE_KEY);
+        return DEFAULT_GUEST_PROFILE;
+      }
+      return parsed;
     } catch {
       // ignore
     }
@@ -65,13 +71,22 @@ export function subscribeToAuthChanges(onProfileChange: (profile: DetectiveProfi
   supabase.auth.getSession().then(({ data: { session } }) => {
     if (session?.user) {
       handleUserSession(session.user, onProfileChange);
+      if (window.location.hash.includes('access_token')) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
   });
 
   // Listen to OAuth redirects, sign-in, sign-out
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     if (session?.user) {
       handleUserSession(session.user, onProfileChange);
+      if (window.location.hash.includes('access_token')) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    } else if (event === 'SIGNED_OUT') {
+      localStorage.removeItem(STORAGE_KEY);
+      onProfileChange(DEFAULT_GUEST_PROFILE);
     }
   });
 
@@ -86,15 +101,15 @@ function handleUserSession(user: any, onProfileChange: (profile: DetectiveProfil
 
   const profile: DetectiveProfile = {
     id: user.id,
-    email: user.email || existing.email,
+    email: user.email || '',
     name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Детектив',
-    avatar: user.user_metadata?.avatar_url || '🕵️‍♂️',
-    xp: isSameUser ? existing.xp : 45,
+    avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || '🕵️‍♂️',
+    xp: isSameUser ? existing.xp : 0,
     streak: isSameUser ? existing.streak : 1,
     lastActiveDate: new Date().toISOString().split('T')[0],
-    alibiCount: isSameUser ? existing.alibiCount : 2,
+    alibiCount: isSameUser ? existing.alibiCount : 1,
     completedEpisodes: isSameUser ? existing.completedEpisodes : [],
-    unlockedClues: isSameUser ? existing.unlockedClues : ['hotel_key_note'],
+    unlockedClues: isSameUser ? existing.unlockedClues : [],
     disarmedTrapsCount: isSameUser ? existing.disarmedTrapsCount : 0,
     isGuest: false,
   };
@@ -103,71 +118,57 @@ function handleUserSession(user: any, onProfileChange: (profile: DetectiveProfil
   onProfileChange(profile);
 }
 
-// Google OAuth Login
+// Google OAuth Login - REAL GOOGLE AUTH ONLY
 export async function signInWithGoogle() {
-  if (supabase) {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (error) throw error;
-    return data;
-  } else {
-    // Demo fallback when keys are not configured yet
-    const guestUser: DetectiveProfile = {
-      ...DEFAULT_GUEST_PROFILE,
-      name: 'Детектив Google',
-      email: 'investigator.google@detlan.app',
-      isGuest: false,
-    };
-    saveLocalProfile(guestUser);
-    return { user: guestUser };
+  if (!supabase) {
+    throw new Error(
+      'У Vercel не налаштовано змінні Supabase! Будь ласка, перейдіть у Vercel -> Settings -> Environment Variables, додайте VITE_SUPABASE_URL та VITE_SUPABASE_ANON_KEY і зробіть Redeploy.'
+    );
   }
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 export async function signInWithEmail(email: string, _pass: string) {
-  if (supabase) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: _pass,
-    });
-    if (error) throw error;
-    return data;
-  } else {
-    const profile: DetectiveProfile = {
-      ...DEFAULT_GUEST_PROFILE,
-      name: email.split('@')[0] || 'Детектив',
-      email,
-      isGuest: false,
-    };
-    saveLocalProfile(profile);
-    return { user: profile };
+  if (!supabase) {
+    throw new Error('Supabase не підключено! Додайте змінні середовища у Vercel.');
   }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password: _pass,
+  });
+
+  if (error) throw error;
+  return data;
 }
 
 export async function signUpWithEmail(email: string, _pass: string, name?: string) {
-  if (supabase) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: _pass,
-      options: {
-        data: { full_name: name || 'Детектив' }
-      }
-    });
-    if (error) throw error;
-    return data;
-  } else {
-    const profile: DetectiveProfile = {
-      ...DEFAULT_GUEST_PROFILE,
-      name: name || email.split('@')[0] || 'Новий детектив',
-      email,
-      isGuest: false,
-    };
-    saveLocalProfile(profile);
-    return { user: profile };
+  if (!supabase) {
+    throw new Error('Supabase не підключено! Додайте змінні середовища у Vercel.');
   }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password: _pass,
+    options: {
+      data: { full_name: name || 'Детектив' }
+    }
+  });
+
+  if (error) throw error;
+  return data;
 }
 
 export async function signOutUser() {

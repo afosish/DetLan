@@ -7,7 +7,7 @@ import {
   type DetectiveProfile 
 } from '../services/supabase';
 import { soundEngine } from '../services/soundEngine';
-import { X, Mail, Lock, UserCheck, ShieldAlert, Sparkles, LogOut } from 'lucide-react';
+import { X, Mail, Lock, UserCheck, ShieldAlert, LogOut } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -36,15 +36,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMessage(null);
     soundEngine.playTypewriter();
     try {
-      const res = await signInWithGoogle();
-      if (res && 'user' in res && res.user) {
-        onProfileUpdated(res.user as DetectiveProfile);
-        soundEngine.playVictory();
-        onClose();
-      }
+      await signInWithGoogle();
+      // Browser redirects to Google accounts page
     } catch (err: any) {
       setErrorMessage(err.message || 'Помилка авторизації через Google');
-    } finally {
       setLoading(false);
     }
   };
@@ -61,15 +56,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (isSignUp) {
-        const res = await signUpWithEmail(email, password, name);
-        if (res && 'user' in res && res.user) {
-          onProfileUpdated(res.user as DetectiveProfile);
-        }
+        await signUpWithEmail(email, password, name);
       } else {
-        const res = await signInWithEmail(email, password);
-        if (res && 'user' in res && res.user) {
-          onProfileUpdated(res.user as DetectiveProfile);
-        }
+        await signInWithEmail(email, password);
       }
       soundEngine.playVictory();
       onClose();
@@ -80,26 +69,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleGuestLogin = () => {
-    soundEngine.playStampThud();
-    const guest: DetectiveProfile = {
-      ...currentProfile,
-      name: 'Еркюль Пуаро (Гість)',
-      isGuest: true,
-    };
-    onProfileUpdated(guest);
-    onClose();
-  };
-
   const handleLogout = async () => {
     soundEngine.playTypewriter();
     await signOutUser();
     const resetGuest: DetectiveProfile = {
-      ...currentProfile,
-      name: 'Детектив-стажер',
+      id: 'guest',
       email: '',
-      isGuest: true,
+      name: 'Гість',
+      avatar: '🕵️‍♂️',
       xp: 0,
+      streak: 1,
+      lastActiveDate: new Date().toISOString().split('T')[0],
+      alibiCount: 1,
+      completedEpisodes: [],
+      unlockedClues: [],
+      disarmedTrapsCount: 0,
+      isGuest: true,
     };
     onProfileUpdated(resetGuest);
     onClose();
@@ -294,17 +279,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           </>
         )}
-
-        {/* Guest Demo Login Option */}
-        <div className="mt-5 pt-4 border-t border-slate-800 text-center">
-          <button
-            onClick={handleGuestLogin}
-            className="text-xs text-slate-400 hover:text-[#f5d77f] font-mono flex items-center justify-center gap-1.5 mx-auto transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#d4af37]" />
-            <span>Швидкий вхід як Запрошений Детектив (Demo)</span>
-          </button>
-        </div>
       </div>
     </div>
   );
