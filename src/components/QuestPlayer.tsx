@@ -19,6 +19,7 @@ import {
   Search,
   GripVertical,
   Puzzle,
+  Target,
   ArrowUp,
   ArrowDown,
   RotateCcw
@@ -687,53 +688,91 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
             {activeStep.type === 'sentence_assembly' && activeStep.sentenceFragments && (
               <div className="bg-gradient-to-b from-[#18263e] to-[#0e1626] border-2 border-[#d4af37]/60 rounded-3xl p-5 sm:p-7 shadow-2xl mb-4 animate-in fade-in">
                 {/* Instruction */}
-                <div className="text-xs sm:text-sm text-slate-200 mb-4 font-sans leading-relaxed flex items-center gap-1.5">
+                <div className="text-xs sm:text-sm text-slate-200 mb-3 font-sans leading-relaxed flex items-center gap-1.5">
                   <Puzzle className="w-4 h-4 text-amber-400 shrink-0" />
                   <span className="text-amber-400 font-bold">Завдання:</span>
                   <span>{activeStep.instruction}</span>
                 </div>
 
+                {/* Target Translation Banner */}
+                {activeStep.sentenceFragments.targetTranslation && (
+                  <div className="mb-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-inner">
+                    <Target className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-[11px] font-mono text-amber-400 uppercase tracking-wider font-semibold">
+                        Цільова фраза для складання:
+                      </div>
+                      <div className="text-sm sm:text-base font-serif-vintage text-amber-100 font-bold mt-0.5">
+                        {activeStep.sentenceFragments.targetTranslation}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Assembly Drop Zone */}
                 <div className="mb-4">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                    📝 Зона відновлення записки:
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1">📝 Відновлена записка:</span>
+                    <span className="text-[10px] text-slate-500">(натисніть на слово, щоб повернути)</span>
                   </div>
-                  <div className="min-h-[60px] p-3 bg-[#fbf7ee] border-2 border-amber-800/40 rounded-2xl flex flex-wrap gap-2 items-center shadow-inner rotate-[-0.3deg]">
+                  <div className="min-h-[64px] p-3 bg-[#fbf7ee] border-2 border-amber-800/40 rounded-2xl flex flex-wrap gap-2 items-center shadow-inner rotate-[-0.2deg]">
                     {assembledWords.length === 0 ? (
-                      <span className="text-xs italic text-amber-900/50 font-serif">Перетягніть слова сюди, щоб відновити записку...</span>
+                      <span className="text-xs italic text-amber-900/60 font-serif">
+                        Натискайте на слова нижче у потрібному порядку, щоб зібрати фразу...
+                      </span>
                     ) : (
-                      assembledWords.map((word, idx) => (
-                        <button
-                          key={`assembled-${idx}`}
-                          onClick={() => handleRemoveWord(word, idx)}
-                          disabled={isSentenceCorrect === true}
-                          className="px-3 py-1.5 bg-[#d4af37] text-[#0a0e17] rounded-lg text-xs sm:text-sm font-bold font-serif-vintage shadow-md hover:bg-[#e5c158] transition-all active:scale-95 cursor-pointer border border-amber-700/50"
-                        >
-                          {word}
-                        </button>
-                      ))
+                      assembledWords.map((word, idx) => {
+                        const hint = activeStep.sentenceFragments?.wordHints?.[word];
+                        return (
+                          <button
+                            key={`assembled-${idx}`}
+                            onClick={() => handleRemoveWord(word, idx)}
+                            disabled={isSentenceCorrect === true}
+                            className="group inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#d4af37] text-[#0a0e17] rounded-xl text-xs sm:text-sm font-bold font-serif-vintage shadow-md hover:bg-[#e5c158] transition-all active:scale-95 cursor-pointer border border-amber-700/50"
+                          >
+                            <span>{word}</span>
+                            {hint && (
+                              <span className="text-[10px] text-amber-950/70 font-mono font-medium">
+                                ({hint})
+                              </span>
+                            )}
+                            <span className="text-[10px] text-amber-900/60 group-hover:text-red-700 font-bold ml-0.5">✕</span>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
                 </div>
 
                 {/* Available Word Chips */}
                 <div className="mb-4">
-                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <GripVertical className="w-3 h-3" /> Фрагменти записки:
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span className="flex items-center gap-1">
+                      <GripVertical className="w-3 h-3 text-amber-400" /> Доступні фрагменти:
+                    </span>
+                    <span className="text-[10px] text-slate-500">(натискайте по черзі)</span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {availableWords.map((word, idx) => (
-                      <button
-                        key={`available-${idx}`}
-                        onClick={() => handleAddWord(word, idx)}
-                        disabled={isSentenceCorrect === true}
-                        className="px-3 py-1.5 bg-[#172338] text-slate-200 rounded-lg text-xs sm:text-sm font-mono border-2 border-slate-600 hover:border-[#d4af37] hover:text-[#f5d77f] hover:bg-[#1d2d48] transition-all active:scale-95 cursor-pointer shadow-sm"
-                      >
-                        {word}
-                      </button>
-                    ))}
+                    {availableWords.map((word, idx) => {
+                      const hint = activeStep.sentenceFragments?.wordHints?.[word];
+                      return (
+                        <button
+                          key={`available-${idx}`}
+                          onClick={() => handleAddWord(word, idx)}
+                          disabled={isSentenceCorrect === true}
+                          className="group inline-flex flex-col items-center px-3.5 py-2 bg-[#172338] text-slate-200 rounded-xl text-xs sm:text-sm font-serif-vintage border-2 border-slate-600 hover:border-[#d4af37] hover:text-[#f5d77f] hover:bg-[#1d2d48] transition-all active:scale-95 cursor-pointer shadow-sm"
+                        >
+                          <span className="font-bold text-white group-hover:text-[#f5d77f]">{word}</span>
+                          {hint && (
+                            <span className="text-[10px] font-mono text-slate-400 group-hover:text-amber-300/90 mt-0.5">
+                              {hint}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                     {availableWords.length === 0 && assembledWords.length > 0 && (
-                      <span className="text-[10px] italic text-slate-500">Усі фрагменти використано</span>
+                      <span className="text-[10px] italic text-slate-500 py-2">Усі фрагменти використано</span>
                     )}
                   </div>
                 </div>
