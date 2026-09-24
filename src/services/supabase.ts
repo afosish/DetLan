@@ -36,6 +36,7 @@ export interface DetectiveProfile {
   unlockedClues: string[];
   disarmedTrapsCount: number;
   isGuest: boolean;
+  caseProgress?: Record<string, number>;
 }
 
 export const DEFAULT_GUEST_PROFILE: DetectiveProfile = {
@@ -51,6 +52,7 @@ export const DEFAULT_GUEST_PROFILE: DetectiveProfile = {
   unlockedClues: [],
   disarmedTrapsCount: 0,
   isGuest: true,
+  caseProgress: {},
 };
 
 const STORAGE_KEY = 'detlan_detective_profile';
@@ -173,12 +175,65 @@ function handleUserSession(user: any, onProfileChange: (profile: DetectiveProfil
     completedEpisodes: existing ? existing.completedEpisodes : [],
     unlockedClues: existing ? existing.unlockedClues : [],
     disarmedTrapsCount: existing ? existing.disarmedTrapsCount : 0,
+    caseProgress: existing?.caseProgress || {},
     isGuest: false,
   };
 
   localStorage.setItem(userKey, JSON.stringify(profile));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
   onProfileChange(profile);
+}
+
+export function getSavedCaseStep(userId: string, caseId: string): number {
+  try {
+    const raw = localStorage.getItem(`detlan_case_step_${userId}_${caseId}`);
+    if (raw !== null) {
+      const parsed = parseInt(raw, 10);
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
+    }
+    const local = getLocalProfile();
+    if (local?.caseProgress && typeof local.caseProgress[caseId] === 'number') {
+      return local.caseProgress[caseId];
+    }
+  } catch {}
+  return 0;
+}
+
+export function saveCaseStep(userId: string, caseId: string, stepIndex: number) {
+  try {
+    localStorage.setItem(`detlan_case_step_${userId}_${caseId}`, String(stepIndex));
+    const local = getLocalProfile();
+    const updated: DetectiveProfile = {
+      ...local,
+      caseProgress: {
+        ...(local.caseProgress || {}),
+        [caseId]: stepIndex,
+      },
+    };
+    saveLocalProfile(updated);
+    if (userId && userId !== 'guest') {
+      localStorage.setItem(`detlan_profile_${userId}`, JSON.stringify(updated));
+    }
+  } catch {}
+}
+
+export function clearCaseStep(userId: string, caseId: string) {
+  try {
+    localStorage.removeItem(`detlan_case_step_${userId}_${caseId}`);
+    const local = getLocalProfile();
+    if (local?.caseProgress && caseId in local.caseProgress) {
+      const copy = { ...local.caseProgress };
+      delete copy[caseId];
+      const updated: DetectiveProfile = {
+        ...local,
+        caseProgress: copy,
+      };
+      saveLocalProfile(updated);
+      if (userId && userId !== 'guest') {
+        localStorage.setItem(`detlan_profile_${userId}`, JSON.stringify(updated));
+      }
+    }
+  } catch {}
 }
 
 export function resetUserProfile(userId: string): DetectiveProfile {
@@ -192,7 +247,15 @@ export function resetUserProfile(userId: string): DetectiveProfile {
     completedEpisodes: [],
     unlockedClues: [],
     disarmedTrapsCount: 0,
+    caseProgress: {},
   };
+  // Also clean case progress keys
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(`detlan_case_step_${userId}_`)) {
+      localStorage.removeItem(k);
+    }
+  }
   localStorage.setItem(`detlan_profile_${userId}`, JSON.stringify(resetProfile));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(resetProfile));
   return resetProfile;

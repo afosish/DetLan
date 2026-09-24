@@ -1,6 +1,7 @@
 import React from 'react';
 import type { DetectiveCase } from '../data/curriculum';
 import type { DetectiveProfile } from '../services/supabase';
+import { getSavedCaseStep } from '../services/supabase';
 import { soundEngine } from '../services/soundEngine';
 import { MapPin, Lock, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 
@@ -103,6 +104,8 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
           {cases.map((detCase, idx) => {
             const isCompleted = profile.completedEpisodes.includes(detCase.id) || (profile.xp >= 100 && idx === 0 && profile.completedEpisodes.length > 0);
             const isUnlocked = profile.xp >= detCase.requiredXp || (detCase.requiredClue && profile.unlockedClues.includes(detCase.requiredClue)) || (idx > 0 && profile.completedEpisodes.includes(cases[idx - 1]?.id));
+            const savedStep = getSavedCaseStep(profile.id, detCase.id);
+            const hasProgress = savedStep > 0 && !isCompleted;
 
             return (
               <div
@@ -141,6 +144,11 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
                       <CheckCircle className="w-3.5 h-3.5" />
                       <span>РОЗКРИТО</span>
                     </span>
+                  ) : hasProgress ? (
+                    <span className="flex items-center gap-1.5 text-amber-900 font-bold bg-amber-200/90 px-2 py-0.5 rounded-full border border-amber-600/30 text-[10px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                      <span>Рівень {savedStep + 1}/{detCase.steps.length}</span>
+                    </span>
                   ) : isUnlocked ? (
                     <span className="text-amber-800 font-bold bg-amber-100 px-2 py-0.5 rounded-full">
                       АКТИВНЕ
@@ -177,7 +185,7 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
 
                   {isUnlocked ? (
                     <div className="flex items-center gap-1 text-amber-900 font-bold group-hover:translate-x-1 transition-transform">
-                      <span>Розслідувати</span>
+                      <span>{isCompleted ? 'Пройти знову' : hasProgress ? `Продовжити (Рівень ${savedStep + 1})` : 'Розслідувати'}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   ) : (

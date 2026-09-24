@@ -3,6 +3,7 @@ import type { DetectiveCase, CrimeSceneHotspot, TimelineEvent } from '../data/cu
 import type { DetectiveProfile } from '../services/supabase';
 import { soundEngine } from '../services/soundEngine';
 import confetti from 'canvas-confetti';
+import { getSavedCaseStep, saveCaseStep, clearCaseStep } from '../services/supabase';
 import { 
   ArrowLeft, 
   Volume2, 
@@ -19,7 +20,8 @@ import {
   GripVertical,
   Puzzle,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  RotateCcw
 } from 'lucide-react';
 
 interface QuestPlayerProps {
@@ -31,17 +33,36 @@ interface QuestPlayerProps {
 
 export const QuestPlayer: React.FC<QuestPlayerProps> = ({
   detectiveCase,
+  profile,
   onExit,
   onCompleteCase,
 }) => {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const calculateCaseXpUpTo = useCallback((stepIdx: number) => {
+    return detectiveCase.steps.slice(0, stepIdx).reduce((acc, s) => acc + (s.xpReward || 0), 0);
+  }, [detectiveCase.steps]);
+
+  // Persistent Case Level Progress
+  const savedStep = getSavedCaseStep(profile.id, detectiveCase.id);
+  const initialIndex = (savedStep > 0 && savedStep < detectiveCase.steps.length) ? savedStep : 0;
+
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(initialIndex);
+  const [highestUnlockedStep, setHighestUnlockedStep] = useState<number>(initialIndex);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
-  const [totalCaseXp, setTotalCaseXp] = useState(0);
+  const [totalCaseXp, setTotalCaseXp] = useState<number>(() => calculateCaseXpUpTo(initialIndex));
   const [isCaseFinished, setIsCaseFinished] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  // Sync state if case or user profile changes
+  useEffect(() => {
+    const saved = getSavedCaseStep(profile.id, detectiveCase.id);
+    const validSaved = (saved > 0 && saved < detectiveCase.steps.length) ? saved : 0;
+    setCurrentStepIndex(validSaved);
+    setHighestUnlockedStep(validSaved);
+    setTotalCaseXp(calculateCaseXpUpTo(validSaved));
+  }, [detectiveCase.id, profile.id, calculateCaseXpUpTo]);
 
   // 3 Attempts Cracking Magnifying Glasses
   const [attemptsLeft, setAttemptsLeft] = useState(3);
@@ -358,10 +379,19 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
   const handleNextStep = () => {
     soundEngine.playTypewriter();
     if (currentStepIndex + 1 < detectiveCase.steps.length) {
-      setCurrentStepIndex(prev => prev + 1);
+      const nextIdx = currentStepIndex + 1;
+      setCurrentStepIndex(nextIdx);
+      setHighestUnlockedStep(prev => {
+        const updated = Math.max(prev, nextIdx);
+        saveCaseStep(profile.id, detectiveCase.id, updated);
+        return updated;
+      });
+      saveCaseStep(profile.id, detectiveCase.id, nextIdx);
+      setTotalCaseXp(calculateCaseXpUpTo(nextIdx));
     } else {
-      // Finished all 15 stages!
+      // Finished all stages!
       setIsCaseFinished(true);
+      saveCaseStep(profile.id, detectiveCase.id, detectiveCase.steps.length - 1);
       soundEngine.playVictory();
       confetti({
         particleCount: 150,
@@ -372,8 +402,32 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
     }
   };
 
+  const handleJumpToLevel = (targetIndex: number) => {
+    if (targetIndex === currentStepIndex) return;
+    const isLevelUnlocked = profile.completedEpisodes.includes(detectiveCase.id) || targetIndex <= highestUnlockedStep;
+    if (!isLevelUnlocked) {
+      soundEngine.playTrapError();
+      return;
+    }
+    soundEngine.playTypewriter();
+    setCurrentStepIndex(targetIndex);
+    saveCaseStep(profile.id, detectiveCase.id, targetIndex);
+    setTotalCaseXp(calculateCaseXpUpTo(targetIndex));
+  };
+
+  const handleRestartCase = () => {
+    if (window.confirm('Почати розслідування цієї справи спочатку (з 1-го рівня)?')) {
+      soundEngine.playTypewriter();
+      setCurrentStepIndex(0);
+      setHighestUnlockedStep(0);
+      setTotalCaseXp(0);
+      saveCaseStep(profile.id, detectiveCase.id, 0);
+    }
+  };
+
   const handleFinishAndClaim = () => {
     soundEngine.playStampThud();
+    clearCaseStep(profile.id, detectiveCase.id);
     onCompleteCase(totalCaseXp, detectiveCase.rewardItem, detectiveCase.badgeReward);
   };
 
@@ -382,17 +436,28 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
   return (
     <div className="flex-1 max-w-4xl mx-auto w-full p-3 sm:p-6 flex flex-col justify-between selection:bg-[#d4af37] selection:text-black">
       {/* Top Header / Progress Bar */}
-      <div className="flex items-center justify-between gap-3 mb-5">
-        <button
-          onClick={() => {
-            soundEngine.playTypewriter();
-            onExit();
-          }}
-          className="p-2 sm:px-3 sm:py-2 bg-[#172236] hover:bg-[#20304c] text-slate-300 rounded-xl flex items-center gap-1.5 text-xs font-mono border border-slate-700 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Дошка справ</span>
-        </button>
+      <div className="flex items-center justify-between gap-2 sm:gap-3 mb-2.5">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              soundEngine.playTypewriter();
+              onExit();
+            }}
+            className="p-2 sm:px-3 sm:py-2 bg-[#172236] hover:bg-[#20304c] text-slate-300 rounded-xl flex items-center gap-1.5 text-xs font-mono border border-slate-700 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Дошка справ</span>
+          </button>
+
+          <button
+            onClick={handleRestartCase}
+            title="Почати розслідування цієї справи з 1-го рівня"
+            className="p-2 sm:px-2.5 sm:py-2 bg-[#172236] hover:bg-[#20304c] text-slate-400 hover:text-amber-300 rounded-xl flex items-center gap-1 text-xs font-mono border border-slate-700 transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">З початку</span>
+          </button>
+        </div>
 
         {/* Progress Bar & Level indicator */}
         <div className="flex-1 max-w-xs sm:max-w-md mx-2">
@@ -436,6 +501,39 @@ export const QuestPlayer: React.FC<QuestPlayerProps> = ({
           <Sparkles className="w-3.5 h-3.5" />
           <span>+{totalCaseXp} XP</span>
         </div>
+      </div>
+
+      {/* Level Rail / Selector - Allows jumping to any unlocked level */}
+      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-2 mb-3 px-1 scrollbar-thin scrollbar-thumb-amber-900/40">
+        <span className="text-[10px] font-mono text-slate-400 shrink-0 mr-1 hidden sm:inline">Рівні:</span>
+        {detectiveCase.steps.map((step, idx) => {
+          const isCurrent = idx === currentStepIndex;
+          const isPassed = idx < highestUnlockedStep || profile.completedEpisodes.includes(detectiveCase.id);
+          const isUnlocked = isPassed || idx <= highestUnlockedStep;
+
+          return (
+            <button
+              key={step.id}
+              onClick={() => isUnlocked && handleJumpToLevel(idx)}
+              disabled={!isUnlocked}
+              className={`shrink-0 h-7 px-2.5 rounded-lg font-mono text-[10px] sm:text-[11px] font-bold flex items-center gap-1 transition-all ${
+                isCurrent
+                  ? 'bg-[#d4af37] text-slate-950 shadow-md scale-105 ring-2 ring-amber-400/50'
+                  : isUnlocked
+                  ? 'bg-[#172236] hover:bg-[#20304c] text-amber-300 border border-amber-900/40 cursor-pointer hover:border-amber-500/50'
+                  : 'bg-slate-900/40 text-slate-600 border border-slate-800/40 cursor-not-allowed opacity-40'
+              }`}
+              title={`${step.title} (${isUnlocked ? 'Відкрито' : 'Заблоковано'})`}
+            >
+              {isPassed && !isCurrent ? (
+                <span className="text-[9px] text-emerald-400">✓</span>
+              ) : !isUnlocked ? (
+                <span className="text-[8px] opacity-70">🔒</span>
+              ) : null}
+              <span>{idx + 1}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Main Quest Interaction Body */}
