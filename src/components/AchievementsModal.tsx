@@ -58,13 +58,13 @@ export const AchievementsModal: React.FC<AchievementsModalProps> = ({
                   key={i}
                   className="px-3 py-1.5 bg-[#0e1624] border border-[#d4af37]/30 rounded-xl text-xs text-amber-200 flex items-center gap-1.5 shadow-inner"
                 >
-                  <span>🗝️</span>
+                  <span>{clue.includes('архів') || clue.includes('валіз') ? '💼' : '🗝️'}</span>
                   <span>{clue === 'hotel_key_note' ? 'Ключ від мансарди готелю' : clue}</span>
                 </div>
               ))
             ) : (
               <div className="text-xs text-slate-400 italic font-mono">
-                Інвентар порожній. Розкрийте справу №1, щоб отримати перший ключ!
+                Інвентар речових доказів порожній. Розкрийте справу №1, щоб отримати секретний архів!
               </div>
             )}
           </div>

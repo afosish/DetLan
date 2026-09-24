@@ -69,7 +69,7 @@ export const CrimeBoard: React.FC<CrimeBoardProps> = ({
           <line x1="85%" y1="15%" x2="52%" y2="85%" stroke="#7f1d1d" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.4"/>
 
           {/* Dynamic Evidence Yarn connecting Case 1 to Case 2 */}
-          {profile.completedEpisodes.includes('case-01-missing-key') || profile.unlockedClues.includes('Ключ від мансарди') ? (
+          {profile.completedEpisodes.includes('case-01-missing-suitcase') || profile.unlockedClues.includes('Секретний архів кур\'єра') || profile.completedEpisodes.includes('case-01-missing-key') || profile.unlockedClues.includes('Ключ від мансарди') ? (
             <g filter="url(#yarn-glow)">
               <line
                 x1="25%"

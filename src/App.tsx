@@ -81,7 +81,7 @@ export const App: React.FC = () => {
   const handleCompleteCase = (earnedXp: number, rewardItem: string, _badge: string) => {
     const updatedXp = profile.xp + earnedXp;
     const updatedClues = Array.from(new Set([...profile.unlockedClues, rewardItem]));
-    const updatedEpisodes = Array.from(new Set([...profile.completedEpisodes, activeCase?.id || 'case-01-missing-key']));
+    const updatedEpisodes = Array.from(new Set([...profile.completedEpisodes, activeCase?.id || 'case-01-missing-suitcase']));
     const updatedAlibis = profile.alibiCount + 1; // Awarded 1 streak freeze
 
     const updatedProfile: DetectiveProfile = {

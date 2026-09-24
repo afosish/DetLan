@@ -19,22 +19,23 @@ interface VocabularyItem {
 }
 
 const COLLECTED_VOCABULARY: VocabularyItem[] = [
-  // Справа 1: Гранд-Готель "Балкани"
-  { bg: 'Добър вечер', ua: 'Добрий вечір', context: 'Ввічливе привітання портьє', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
-  { bg: 'гостът', ua: 'гість (з артиклем -ът)', context: 'Фігурант справи', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
-  { bg: 'стая', ua: 'кімната / готельний номер', context: 'Номер 42', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
-  { bg: 'ключът', ua: 'ключ (означений)', context: 'Речовий доказ', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
-  { bg: 'асансьор', ua: 'ліфт', context: 'Шлях до мансарди', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
-  { bg: 'под килима', ua: 'під килимом', context: 'Схованка ключа', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
-  { bg: 'тръгнете', ua: 'йдіть, рушайте', context: 'Вказівка в записці', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
-  { bg: 'надясно', ua: 'праворуч', context: 'Справжній правий поворот', caseId: 'case-01-missing-key', caseTitle: 'Справа №1' },
+  // Справа 1: Центральна гара Софії (Таємниця зниклої валізи)
+  { bg: 'Добър ден', ua: 'Добрий день', context: 'Ввічливе звернення до чергового', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'изгубен багаж', ua: 'втрачений багаж', context: 'Предмет розслідування', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'куфарът', ua: 'валіза (з артиклем -ът)', context: 'Дипломатичний архів', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'направо', ua: 'суворо прямо (не праворуч!)', context: 'Напрямок руху втікача', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'надясно', ua: 'праворуч', context: 'Справжній правий поворот', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'втори коловоз', ua: 'друга колія', context: 'Місце відправлення поїзда', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'билет за влак', ua: 'квиток на потяг', context: 'Речовий доказ під лавкою', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'гора', ua: 'ліс (не скеляста гора!)', context: 'Схованка злочинця біля депо', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
+  { bg: 'десет и трийсет', ua: 'десята тридцять (10:30)', context: 'Час відправлення поїзда', caseId: 'case-01-missing-suitcase', caseTitle: 'Справа №1' },
 
   // Справа 2: Експрес "Софія — Варна"
-  { bg: 'билетът', ua: 'квиток', context: 'Алібі на залізниці', caseId: 'case-02-fake-alibi', caseTitle: 'Справа №2' },
-  { bg: 'девет часа', ua: 'дев\'ята година', context: 'Час скоєння злочину', caseId: 'case-02-fake-alibi', caseTitle: 'Справа №2' },
-  { bg: 'тридесет минути', ua: 'тридцять хвилин', context: 'Критична різниця в алібі', caseId: 'case-02-fake-alibi', caseTitle: 'Справа №2' },
-  { bg: 'напусна', ua: 'покинув, вийшов із', context: 'Дія підозрюваного', caseId: 'case-02-fake-alibi', caseTitle: 'Справа №2' },
-  { bg: 'лъжете', ua: 'ви брешете', context: 'Викриття на допиті', caseId: 'case-02-fake-alibi', caseTitle: 'Справа №2' },
+  { bg: 'маса', ua: 'стіл (обідній/письмовий)', context: 'Сервірування у вагоні-ресторані', caseId: 'case-02-orient-express', caseTitle: 'Справа №2' },
+  { bg: 'стол', ua: 'стілець (не стіл!)', context: 'Меблі вагона-ресторану', caseId: 'case-02-orient-express', caseTitle: 'Справа №2' },
+  { bg: 'диня', ua: 'кавун (не жовта диня!)', context: 'Фруктовий десерт пані Данилової', caseId: 'case-02-orient-express', caseTitle: 'Справа №2' },
+  { bg: 'булка', ua: 'наречена (не булочка!)', context: 'Таємнича записка про викуп', caseId: 'case-02-orient-express', caseTitle: 'Справа №2' },
+  { bg: 'лъжете', ua: 'ви брешете', context: 'Викриття офіціанта на допиті', caseId: 'case-02-orient-express', caseTitle: 'Справа №2' },
 ];
 
 export const DossierNotebook: React.FC<DossierNotebookProps> = ({ isOpen, onClose, profile }) => {
@@ -43,7 +44,8 @@ export const DossierNotebook: React.FC<DossierNotebookProps> = ({ isOpen, onClos
   if (!isOpen) return null;
 
   const unlockedWords = COLLECTED_VOCABULARY.filter(item => 
-    profile.completedEpisodes.includes(item.caseId)
+    profile.completedEpisodes.includes(item.caseId) ||
+    (item.caseId === 'case-01-missing-suitcase' && profile.completedEpisodes.includes('case-01-missing-key'))
   );
 
   return (
